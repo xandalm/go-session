@@ -3,6 +3,7 @@ package session
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -47,15 +48,8 @@ func TestManager(t *testing.T) {
 	cookieName := "SessionID"
 	provider := &StubProvider{}
 	manager := NewManager(provider, cookieName, 3600)
-	want := Manager{
-		provider,
-		cookieName,
-		3600,
-	}
 
 	asserNoNil(t, manager)
-
-	assertSameManager(t, *manager, want)
 
 	t.Run("start a session", func(t *testing.T) {
 		req, _ := http.NewRequest(http.MethodGet, "http://site.com", nil)
@@ -63,9 +57,12 @@ func TestManager(t *testing.T) {
 
 		session := manager.StartSession(res, req)
 
-		if session == nil {
-			t.Error("didn't get session")
-		}
+		asserNoNil(t, session)
+
+		cookie := getCookie(res)
+
+		checkCookie(t, cookie, cookieName)
+
 	})
 }
 
@@ -73,14 +70,41 @@ func asserNoNil(t testing.TB, v any) {
 	t.Helper()
 
 	if v == nil {
-		t.Fatalf("expected no nil, got %v", v)
+		t.Fatal("expected no nil")
 	}
 }
 
-func assertSameManager(t testing.TB, a, b Manager) {
+func checkCookie(t *testing.T, cookie map[string]any, name string) {
 	t.Helper()
 
-	if a != b {
-		t.Fatalf("expected %v to be equal %v", a, b)
+	sid, ok := cookie[name]
+
+	if !ok {
+		t.Fatalf("didn't get %s cookie", name)
 	}
+
+	if sid.(string) == "" {
+		t.Fatalf("got empty %s value", name)
+	}
+}
+
+func getCookie(res *httptest.ResponseRecorder) (cookie map[string]any) {
+	set_cookie := res.Header()["Set-Cookie"]
+
+	cookie = make(map[string]any)
+
+	if len(set_cookie) < 1 {
+		return nil
+	}
+
+	for _, pair := range strings.Split(set_cookie[0], "; ") {
+		kv := strings.Split(pair, "=")
+		if len(kv) > 1 {
+			cookie[kv[0]] = kv[1]
+			continue
+		}
+		cookie[kv[0]] = true
+	}
+
+	return
 }

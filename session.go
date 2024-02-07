@@ -1,6 +1,13 @@
 package session
 
-import "net/http"
+import (
+	"crypto/rand"
+	"encoding/base64"
+	"io"
+	"net/http"
+	"net/url"
+	"sync"
+)
 
 type Session interface {
 	Set(key, value any) error
@@ -17,6 +24,7 @@ type Provider interface {
 }
 
 type Manager struct {
+	mu          sync.Mutex
 	provider    Provider
 	cookieName  string
 	maxLifeTime int64
@@ -30,7 +38,24 @@ func NewManager(provider Provider, cookieName string, maxLifeTime int64) *Manage
 	}
 }
 
+func (m *Manager) sessionID() string {
+	b := make([]byte, 32)
+	if _, err := io.ReadFull(rand.Reader, b); err != nil {
+		return ""
+	}
+	return base64.URLEncoding.EncodeToString(b)
+}
+
 func (m *Manager) StartSession(w http.ResponseWriter, r *http.Request) (session Session) {
-	sess, _ := m.provider.SessionInit("")
-	return sess
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cookie, err := r.Cookie(m.cookieName)
+	if err != nil || cookie.Value == "" {
+		sid := m.sessionID()
+		session, _ = m.provider.SessionInit(sid)
+		cookie := http.Cookie{Name: m.cookieName, Value: url.QueryEscape(sid), Path: "/", HttpOnly: true, MaxAge: int(m.maxLifeTime)}
+		http.SetCookie(w, &cookie)
+	}
+
+	return
 }
