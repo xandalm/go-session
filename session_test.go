@@ -3,11 +3,14 @@ package session
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 )
 
 type StubSession struct {
+	id string
 }
 
 func (s *StubSession) Set(key, value any) error {
@@ -27,15 +30,23 @@ func (s *StubSession) SessionID() string {
 }
 
 type StubProvider struct {
+	sessions map[string]Session
 }
 
 func (p *StubProvider) SessionInit(sid string) (Session, error) {
-	sess := &StubSession{}
+	if p.sessions == nil {
+		p.sessions = make(map[string]Session)
+	}
+	sess := &StubSession{
+		id: sid,
+	}
+	p.sessions[sid] = sess
 	return sess, nil
 }
 
 func (p *StubProvider) SessionRead(sid string) (Session, error) {
-	return nil, nil
+	sess := p.sessions[sid]
+	return sess, nil
 }
 
 func (p *StubProvider) SessionDestroy(sid string) error {
@@ -44,47 +55,77 @@ func (p *StubProvider) SessionDestroy(sid string) error {
 
 func (p *StubProvider) SessionGC(maxLifeTime int64) {}
 
+var dummySite = "http://site.com"
+
 func TestManager(t *testing.T) {
 	cookieName := "SessionID"
 	provider := &StubProvider{}
 	manager := NewManager(provider, cookieName, 3600)
 
-	asserNoNil(t, manager)
+	assertNotNil(t, manager)
 
 	t.Run("start a session", func(t *testing.T) {
-		req, _ := http.NewRequest(http.MethodGet, "http://site.com", nil)
+		req, _ := http.NewRequest(http.MethodGet, dummySite, nil)
 		res := httptest.NewRecorder()
 
 		session := manager.StartSession(res, req)
-
-		asserNoNil(t, session)
+		assertNotNil(t, session)
 
 		cookie := getCookie(res)
+		assertNotNil(t, cookie)
 
-		checkCookie(t, cookie, cookieName)
+		sid := cookie[cookieName]
+		sidStr := sid.(string)
+		assertNotEmpty(t, sidStr)
 
+		assertEqual(t, sidStr, url.QueryEscape(session.(*StubSession).id))
+
+		t.Run("restores same session", func(t *testing.T) {
+
+			path := cookie["Path"].(string)
+			httpOnly := cookie["HttpOnly"].(bool)
+			maxAge, _ := strconv.Atoi(cookie["Max-Age"].(string))
+
+			req, _ := http.NewRequest(http.MethodGet, dummySite+"/admin", nil)
+			req.AddCookie(&http.Cookie{
+				Name:     cookieName,
+				Value:    sidStr,
+				Path:     path,
+				HttpOnly: httpOnly,
+				MaxAge:   maxAge,
+			})
+
+			res := httptest.NewRecorder()
+
+			session := manager.StartSession(res, req)
+			assertNotNil(t, session)
+
+			assertEqual(t, sidStr, url.QueryEscape(session.(*StubSession).id))
+		})
 	})
 }
 
-func asserNoNil(t testing.TB, v any) {
+func assertNotNil(t testing.TB, v any) {
 	t.Helper()
 
 	if v == nil {
-		t.Fatal("expected no nil")
+		t.Fatal("expected not nil")
 	}
 }
 
-func checkCookie(t *testing.T, cookie map[string]any, name string) {
+func assertNotEmpty(t testing.TB, v string) {
 	t.Helper()
 
-	sid, ok := cookie[name]
-
-	if !ok {
-		t.Fatalf("didn't get %s cookie", name)
+	if v == "" {
+		t.Fatalf("expected not empty")
 	}
+}
 
-	if sid.(string) == "" {
-		t.Fatalf("got empty %s value", name)
+func assertEqual(t testing.TB, a, b string) {
+	t.Helper()
+
+	if a != b {
+		t.Fatalf("expected same values, but got %v and %v", a, b)
 	}
 }
 
@@ -93,7 +134,7 @@ func getCookie(res *httptest.ResponseRecorder) (cookie map[string]any) {
 
 	cookie = make(map[string]any)
 
-	if len(set_cookie) < 1 {
+	if len(set_cookie) != 1 {
 		return nil
 	}
 

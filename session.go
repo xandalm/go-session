@@ -55,6 +55,9 @@ func (m *Manager) StartSession(w http.ResponseWriter, r *http.Request) (session 
 		session, _ = m.provider.SessionInit(sid)
 		cookie := http.Cookie{Name: m.cookieName, Value: url.QueryEscape(sid), Path: "/", HttpOnly: true, MaxAge: int(m.maxLifeTime)}
 		http.SetCookie(w, &cookie)
+	} else {
+		sid, _ := url.QueryUnescape(cookie.Value)
+		session, _ = m.provider.SessionRead(sid)
 	}
 
 	return
