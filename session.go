@@ -1,5 +1,7 @@
 package session
 
+import "net/http"
+
 type Session interface {
 	Set(key, value any) error
 	Get(key any) any
@@ -26,4 +28,9 @@ func NewManager(provider Provider, cookieName string, maxLifeTime int64) *Manage
 		cookieName:  cookieName,
 		maxLifeTime: maxLifeTime,
 	}
+}
+
+func (m *Manager) StartSession(w http.ResponseWriter, r *http.Request) (session Session) {
+	sess, _ := m.provider.SessionInit("")
+	return sess
 }
