@@ -21,21 +21,21 @@ type Provider interface {
 	SessionInit(sid string) (Session, error)
 	SessionRead(sid string) (Session, error)
 	SessionDestroy(sid string) error
-	SessionGC(maxLifeTime int64)
+	SessionGC(maxAge int64)
 }
 
 type Manager struct {
-	mu          sync.Mutex
-	provider    Provider
-	cookieName  string
-	maxLifeTime int64
+	mu         sync.Mutex
+	provider   Provider
+	cookieName string
+	maxAge     int64
 }
 
-func NewManager(provider Provider, cookieName string, maxLifeTime int64) *Manager {
+func NewManager(provider Provider, cookieName string, maxAge int64) *Manager {
 	return &Manager{
-		provider:    provider,
-		cookieName:  cookieName,
-		maxLifeTime: maxLifeTime,
+		provider:   provider,
+		cookieName: cookieName,
+		maxAge:     maxAge,
 	}
 }
 
@@ -54,13 +54,12 @@ func (m *Manager) StartSession(w http.ResponseWriter, r *http.Request) (session 
 	if err != nil || cookie.Value == "" {
 		sid := m.sessionID()
 		session, _ = m.provider.SessionInit(sid)
-		cookie := http.Cookie{Name: m.cookieName, Value: url.QueryEscape(sid), Path: "/", HttpOnly: true, MaxAge: int(m.maxLifeTime)}
+		cookie := http.Cookie{Name: m.cookieName, Value: url.QueryEscape(sid), Path: "/", HttpOnly: true, MaxAge: int(m.maxAge)}
 		http.SetCookie(w, &cookie)
 	} else {
 		sid, _ := url.QueryUnescape(cookie.Value)
 		session, _ = m.provider.SessionRead(sid)
 	}
-
 	return
 }
 
@@ -76,4 +75,13 @@ func (m *Manager) DestroySession(w http.ResponseWriter, r *http.Request) {
 		cookie := http.Cookie{Name: m.cookieName, Value: url.QueryEscape(sid), Path: "/", HttpOnly: true, Expires: time.Now(), MaxAge: -1}
 		http.SetCookie(w, &cookie)
 	}
+}
+
+func (m *Manager) GC() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.provider.SessionGC(m.maxAge)
+	time.AfterFunc(time.Duration(m.maxAge), func() {
+		m.GC()
+	})
 }
