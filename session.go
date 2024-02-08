@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"sync"
+	"time"
 )
 
 type Session interface {
@@ -61,4 +62,18 @@ func (m *Manager) StartSession(w http.ResponseWriter, r *http.Request) (session 
 	}
 
 	return
+}
+
+func (m *Manager) DestroySession(w http.ResponseWriter, r *http.Request) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	cookie, err := r.Cookie(m.cookieName)
+	if err != nil || cookie.Value == "" {
+		return
+	} else {
+		sid, _ := url.QueryUnescape(cookie.Value)
+		m.provider.SessionDestroy(sid)
+		cookie := http.Cookie{Name: m.cookieName, Value: url.QueryEscape(sid), Path: "/", HttpOnly: true, Expires: time.Now(), MaxAge: -1}
+		http.SetCookie(w, &cookie)
+	}
 }

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 type StubSession struct {
@@ -26,11 +27,12 @@ func (s *StubSession) Delete(key any) error {
 }
 
 func (s *StubSession) SessionID() string {
-	return ""
+	return s.id
 }
 
 type StubProvider struct {
 	sessions map[string]Session
+	doomed   []Session
 }
 
 func (p *StubProvider) SessionInit(sid string) (Session, error) {
@@ -50,6 +52,7 @@ func (p *StubProvider) SessionRead(sid string) (Session, error) {
 }
 
 func (p *StubProvider) SessionDestroy(sid string) error {
+	p.doomed = append(p.doomed, p.sessions[sid])
 	return nil
 }
 
@@ -64,44 +67,74 @@ func TestManager(t *testing.T) {
 
 	assertNotNil(t, manager)
 
-	t.Run("start a session", func(t *testing.T) {
+	var cookie *http.Cookie = nil
+
+	parseCookie := func(cookie map[string]string) *http.Cookie {
+		maxAge, _ := strconv.Atoi(cookie["Max-Age"])
+		httpOnly, _ := strconv.ParseBool(cookie["HttpOnly"])
+		c := &http.Cookie{
+			Name:     cookieName,
+			Value:    cookie[cookieName],
+			Path:     cookie["Path"],
+			HttpOnly: httpOnly,
+			MaxAge:   maxAge,
+		}
+		expires, hasExpires := cookie["Expires"]
+		if hasExpires {
+			c.Expires, _ = time.Parse(time.RFC1123, expires)
+		}
+		return c
+	}
+
+	t.Run("start the session", func(t *testing.T) {
 		req, _ := http.NewRequest(http.MethodGet, dummySite, nil)
 		res := httptest.NewRecorder()
 
 		session := manager.StartSession(res, req)
 		assertNotNil(t, session)
 
-		cookie := getCookie(res)
+		cookie = parseCookie(getCookieFromResponse(res))
 		assertNotNil(t, cookie)
+		cookie.Name = cookieName
 
-		sid := cookie[cookieName]
-		sidStr := sid.(string)
-		assertNotEmpty(t, sidStr)
+		sid := cookie.Value
 
-		assertEqual(t, sidStr, url.QueryEscape(session.(*StubSession).id))
+		assertNotEmpty(t, sid)
 
-		t.Run("restores same session", func(t *testing.T) {
+		assertEqual(t, sid, url.QueryEscape(session.SessionID()))
+	})
 
-			path := cookie["Path"].(string)
-			httpOnly := cookie["HttpOnly"].(bool)
-			maxAge, _ := strconv.Atoi(cookie["Max-Age"].(string))
+	t.Run("restores the same session", func(t *testing.T) {
 
-			req, _ := http.NewRequest(http.MethodGet, dummySite+"/admin", nil)
-			req.AddCookie(&http.Cookie{
-				Name:     cookieName,
-				Value:    sidStr,
-				Path:     path,
-				HttpOnly: httpOnly,
-				MaxAge:   maxAge,
-			})
+		req, _ := http.NewRequest(http.MethodGet, dummySite+"/admin", nil)
+		req.AddCookie(cookie)
 
-			res := httptest.NewRecorder()
+		res := httptest.NewRecorder()
 
-			session := manager.StartSession(res, req)
-			assertNotNil(t, session)
+		session := manager.StartSession(res, req)
+		assertNotNil(t, session)
 
-			assertEqual(t, sidStr, url.QueryEscape(session.(*StubSession).id))
-		})
+		assertEqual(t, cookie.Value, url.QueryEscape(session.SessionID()))
+	})
+
+	t.Run("destroy the session", func(t *testing.T) {
+
+		req, _ := http.NewRequest(http.MethodGet, dummySite, nil)
+		req.AddCookie(cookie)
+
+		res := httptest.NewRecorder()
+
+		manager.DestroySession(res, req)
+
+		sid, _ := url.QueryUnescape(cookie.Value)
+		assertSessionIsDoomed(t, provider, sid)
+
+		newCookie := parseCookie(getCookieFromResponse(res))
+		assertNotNil(t, newCookie)
+
+		if newCookie.Expires.After(time.Now()) || newCookie.MaxAge != 0 {
+			t.Errorf("the cookie is not expired, Expires = %s and MaxAge = %d", newCookie.Expires, newCookie.MaxAge)
+		}
 	})
 }
 
@@ -129,10 +162,26 @@ func assertEqual(t testing.TB, a, b string) {
 	}
 }
 
-func getCookie(res *httptest.ResponseRecorder) (cookie map[string]any) {
+func assertSessionIsDoomed(t testing.TB, provider *StubProvider, sid string) {
+	t.Helper()
+
+	doomed := false
+	for _, d := range provider.doomed {
+		if d.SessionID() == sid {
+			doomed = true
+			break
+		}
+	}
+
+	if !doomed {
+		t.Fatal("didn't set session to be removed from provider")
+	}
+}
+
+func getCookieFromResponse(res *httptest.ResponseRecorder) (cookie map[string]string) {
 	set_cookie := res.Header()["Set-Cookie"]
 
-	cookie = make(map[string]any)
+	cookie = make(map[string]string)
 
 	if len(set_cookie) != 1 {
 		return nil
@@ -144,7 +193,7 @@ func getCookie(res *httptest.ResponseRecorder) (cookie map[string]any) {
 			cookie[kv[0]] = kv[1]
 			continue
 		}
-		cookie[kv[0]] = true
+		cookie[kv[0]] = "true"
 	}
 
 	return
