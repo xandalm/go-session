@@ -24,16 +24,20 @@ func NewProvider(builder SessionBuilder, storage SessionStorage) *Provider {
 }
 
 var (
-	ErrEmptySessionId     error = errors.New("session provider: the session id cannot be empty")
-	ErrRestoringSession   error = errors.New("session provider: cannot restore session from storage")
-	ErrDuplicateSessionId error = errors.New("session provider: cannot duplicate session id")
+	ErrEmptySessionId           error = errors.New("session provider: the session id cannot be empty")
+	ErrRestoringSession         error = errors.New("session provider: cannot restore session from storage")
+	ErrDuplicateSessionId       error = errors.New("session provider: cannot duplicate session id")
+	ErrCannotEnsureNonDuplicity error = errors.New("session provider: cannot ensure non duplicity of the sid (storage failing)")
 )
 
 func (p *Provider) SessionInit(sid string) (ISession, error) {
 	if sid == "" {
 		return nil, ErrEmptySessionId
 	}
-	ok := p.ensureNonDuplication(sid)
+	ok, err := p.ensureNonDuplication(sid)
+	if err != nil {
+		return nil, ErrCannotEnsureNonDuplicity
+	}
 	if !ok {
 		return nil, ErrDuplicateSessionId
 	}
@@ -42,9 +46,12 @@ func (p *Provider) SessionInit(sid string) (ISession, error) {
 	return sess, nil
 }
 
-func (p *Provider) ensureNonDuplication(sid string) bool {
-	found, _ := p.storage.Get(sid)
-	return found == nil
+func (p *Provider) ensureNonDuplication(sid string) (bool, error) {
+	found, err := p.storage.Get(sid)
+	if err != nil {
+		return false, err
+	}
+	return found == nil, nil
 }
 
 func (p *Provider) SessionRead(sid string) (ISession, error) {

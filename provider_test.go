@@ -33,7 +33,9 @@ func (ss *StubSessionStorage) Get(sid string) (session.ISession, error) {
 	return sess, nil
 }
 
-type StubFailingSessionStorage struct{}
+type StubFailingSessionStorage struct {
+	sessions map[string]session.ISession
+}
 
 var errFoo error = errors.New("foo error")
 
@@ -74,6 +76,19 @@ func TestSessionInit(t *testing.T) {
 		_, err := provider.SessionInit("17af454")
 
 		assertError(t, err, session.ErrDuplicateSessionId)
+	})
+	t.Run("returns error for inability to ensure non-duplicity", func(t *testing.T) {
+		sessionStorage := &StubFailingSessionStorage{
+			sessions: map[string]session.ISession{
+				"17af454": &StubSession{
+					id: "17af454",
+				},
+			},
+		}
+		provider := session.NewProvider(sessionBuilder, sessionStorage)
+		_, err := provider.SessionInit("17af454")
+
+		assertError(t, err, session.ErrCannotEnsureNonDuplicity)
 	})
 }
 
