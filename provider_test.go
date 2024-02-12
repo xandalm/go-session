@@ -62,6 +62,25 @@ func (ss *StubFailingSessionStorage) Destroy(sid string) error {
 	return errFoo
 }
 
+type MockSessionStorage struct {
+	sessions    map[string]session.ISession
+	SaveFunc    func(sess session.ISession) error
+	GetFunc     func(sid string) (session.ISession, error)
+	DestroyFunc func(sid string) error
+}
+
+func (ss *MockSessionStorage) Save(sess session.ISession) error {
+	return ss.SaveFunc(sess)
+}
+
+func (ss *MockSessionStorage) Get(sid string) (session.ISession, error) {
+	return ss.GetFunc(sid)
+}
+
+func (ss *MockSessionStorage) Destroy(sid string) error {
+	return ss.DestroyFunc(sid)
+}
+
 func TestSessionInit(t *testing.T) {
 
 	sessionBuilder := &StubSessionBuilder{}
@@ -101,9 +120,22 @@ func TestSessionInit(t *testing.T) {
 			},
 		}
 		provider := session.NewProvider(sessionBuilder, sessionStorage)
+
 		_, err := provider.SessionInit("17af454")
 
-		assertError(t, err, session.ErrCannotEnsureNonDuplicity)
+		assertError(t, err, session.ErrUnableToEnsureNonDuplicity)
+	})
+	t.Run("returns error for storage save failure", func(t *testing.T) {
+		sessionStorage := &MockSessionStorage{
+			sessions: map[string]session.ISession{},
+			GetFunc:  func(sid string) (session.ISession, error) { return nil, nil },
+			SaveFunc: func(sess session.ISession) error { return errFoo },
+		}
+		provider := session.NewProvider(sessionBuilder, sessionStorage)
+
+		_, err := provider.SessionInit("17af450")
+
+		assertError(t, err, session.ErrUnableToSaveSession)
 	})
 }
 
@@ -189,7 +221,7 @@ func assertError(t testing.TB, got, want error) {
 	}
 
 	if got != want {
-		t.Fatalf("got error %v but want %v", got, want)
+		t.Fatalf(`got error "%v" but want "%v"`, got, want)
 	}
 }
 

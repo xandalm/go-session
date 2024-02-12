@@ -25,11 +25,12 @@ func NewProvider(builder SessionBuilder, storage SessionStorage) *Provider {
 }
 
 var (
-	ErrEmptySessionId           error = errors.New("session: the session id cannot be empty")
-	ErrRestoringSession         error = errors.New("session: cannot restore session from storage")
-	ErrDuplicateSessionId       error = errors.New("session: cannot duplicate session id")
-	ErrCannotEnsureNonDuplicity error = errors.New("session: cannot ensure non duplicity of the sid (storage failing)")
-	ErrUnableToDestroySession   error = errors.New("session: unable to destroy session (storage failing)")
+	ErrEmptySessionId             error = errors.New("session: the session id cannot be empty")
+	ErrRestoringSession           error = errors.New("session: cannot restore session from storage")
+	ErrDuplicateSessionId         error = errors.New("session: cannot duplicate session id")
+	ErrUnableToEnsureNonDuplicity error = errors.New("session: cannot ensure non duplicity of the sid (storage failure)")
+	ErrUnableToDestroySession     error = errors.New("session: unable to destroy session (storage failure)")
+	ErrUnableToSaveSession        error = errors.New("session: unable to save session (storage failure)")
 )
 
 func (p *Provider) SessionInit(sid string) (ISession, error) {
@@ -38,13 +39,15 @@ func (p *Provider) SessionInit(sid string) (ISession, error) {
 	}
 	ok, err := p.ensureNonDuplication(sid)
 	if err != nil {
-		return nil, ErrCannotEnsureNonDuplicity
+		return nil, ErrUnableToEnsureNonDuplicity
 	}
 	if !ok {
 		return nil, ErrDuplicateSessionId
 	}
 	sess := p.builder.Build(sid)
-	p.storage.Save(sess)
+	if err := p.storage.Save(sess); err != nil {
+		return nil, ErrUnableToSaveSession
+	}
 	return sess, nil
 }
 
