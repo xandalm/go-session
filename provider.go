@@ -25,10 +25,11 @@ func NewProvider(builder SessionBuilder, storage SessionStorage) *Provider {
 }
 
 var (
-	ErrEmptySessionId           error = errors.New("session provider: the session id cannot be empty")
-	ErrRestoringSession         error = errors.New("session provider: cannot restore session from storage")
-	ErrDuplicateSessionId       error = errors.New("session provider: cannot duplicate session id")
-	ErrCannotEnsureNonDuplicity error = errors.New("session provider: cannot ensure non duplicity of the sid (storage failing)")
+	ErrEmptySessionId           error = errors.New("session: the session id cannot be empty")
+	ErrRestoringSession         error = errors.New("session: cannot restore session from storage")
+	ErrDuplicateSessionId       error = errors.New("session: cannot duplicate session id")
+	ErrCannotEnsureNonDuplicity error = errors.New("session: cannot ensure non duplicity of the sid (storage failing)")
+	ErrUnableToDestroySession   error = errors.New("session: unable to destroy session (storage failing)")
 )
 
 func (p *Provider) SessionInit(sid string) (ISession, error) {
@@ -64,7 +65,11 @@ func (p *Provider) SessionRead(sid string) (ISession, error) {
 }
 
 func (p *Provider) SessionDestroy(sid string) error {
-	return p.storage.Destroy(sid)
+	err := p.storage.Destroy(sid)
+	if err != nil {
+		return ErrUnableToDestroySession
+	}
+	return nil
 }
 
 func (p *Provider) SessionGC(maxAge int64) {

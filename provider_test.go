@@ -164,6 +164,13 @@ func TestSessionDestroy(t *testing.T) {
 			return a.SessionID() == b.SessionID()
 		})
 	})
+	t.Run("returns error for destroy failing", func(t *testing.T) {
+		provider := session.NewProvider(&StubSessionBuilder{}, &StubFailingSessionStorage{})
+
+		err := provider.SessionDestroy("17af454")
+
+		assertError(t, err, session.ErrUnableToDestroySession)
+	})
 }
 
 func assertNoError(t testing.TB, err error) {
