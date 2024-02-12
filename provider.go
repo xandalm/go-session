@@ -3,7 +3,7 @@ package session
 import "errors"
 
 type SessionBuilder interface {
-	Build(sid string) ISession
+	Build(sid string, onUpdate func(ISession) error) ISession
 }
 
 type SessionStorage interface {
@@ -44,7 +44,7 @@ func (p *Provider) SessionInit(sid string) (ISession, error) {
 	if !ok {
 		return nil, ErrDuplicateSessionId
 	}
-	sess := p.builder.Build(sid)
+	sess := p.builder.Build(sid, p.storage.Save)
 	if err := p.storage.Save(sess); err != nil {
 		return nil, ErrUnableToSaveSession
 	}

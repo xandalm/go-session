@@ -11,9 +11,10 @@ import (
 type StubSessionBuilder struct {
 }
 
-func (sb *StubSessionBuilder) Build(sid string) session.ISession {
+func (sb *StubSessionBuilder) Build(sid string, onUpdate func(session.ISession) error) session.ISession {
 	return &StubSession{
-		id: sid,
+		id:       sid,
+		onUpdate: onUpdate,
 	}
 }
 

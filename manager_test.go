@@ -13,18 +13,22 @@ import (
 )
 
 type StubSession struct {
-	id string
+	id       string
+	onUpdate func(session.ISession) error
 }
 
 func (s *StubSession) Set(key, value any) error {
+	s.onUpdate(s)
 	return nil
 }
 
 func (s *StubSession) Get(key any) any {
+	s.onUpdate(s)
 	return nil
 }
 
 func (s *StubSession) Delete(key any) error {
+	s.onUpdate(s)
 	return nil
 }
 
