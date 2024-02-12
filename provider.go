@@ -9,7 +9,7 @@ type SessionBuilder interface {
 type SessionStorage interface {
 	Save(ISession) error
 	Get(sid string) (ISession, error)
-	Destroy(sid string) error
+	Delete(sid string) error
 }
 
 type Provider struct {
@@ -68,7 +68,7 @@ func (p *Provider) SessionRead(sid string) (ISession, error) {
 }
 
 func (p *Provider) SessionDestroy(sid string) error {
-	err := p.storage.Destroy(sid)
+	err := p.storage.Delete(sid)
 	if err != nil {
 		return ErrUnableToDestroySession
 	}

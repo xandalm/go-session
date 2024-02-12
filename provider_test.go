@@ -2,7 +2,6 @@ package session_test
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/xandalm/go-session"
@@ -19,8 +18,7 @@ func (sb *StubSessionBuilder) Build(sid string, onUpdate func(session.ISession) 
 }
 
 type StubSessionStorage struct {
-	sessions  map[string]session.ISession
-	destroyed []session.ISession
+	sessions map[string]session.ISession
 }
 
 func (ss *StubSessionStorage) Save(sess session.ISession) error {
@@ -36,12 +34,8 @@ func (ss *StubSessionStorage) Get(sid string) (session.ISession, error) {
 	return sess, nil
 }
 
-func (ss *StubSessionStorage) Destroy(sid string) error {
-	sess, ok := ss.sessions[sid]
-	if !ok {
-		return fmt.Errorf("unknown sid")
-	}
-	ss.destroyed = append(ss.destroyed, sess)
+func (ss *StubSessionStorage) Delete(sid string) error {
+	delete(ss.sessions, sid)
 	return nil
 }
 
@@ -59,15 +53,15 @@ func (ss *StubFailingSessionStorage) Get(sid string) (session.ISession, error) {
 	return nil, errFoo
 }
 
-func (ss *StubFailingSessionStorage) Destroy(sid string) error {
+func (ss *StubFailingSessionStorage) Delete(sid string) error {
 	return errFoo
 }
 
 type MockSessionStorage struct {
-	sessions    map[string]session.ISession
-	SaveFunc    func(sess session.ISession) error
-	GetFunc     func(sid string) (session.ISession, error)
-	DestroyFunc func(sid string) error
+	sessions   map[string]session.ISession
+	SaveFunc   func(sess session.ISession) error
+	GetFunc    func(sid string) (session.ISession, error)
+	DeleteFunc func(sid string) error
 }
 
 func (ss *MockSessionStorage) Save(sess session.ISession) error {
@@ -78,8 +72,8 @@ func (ss *MockSessionStorage) Get(sid string) (session.ISession, error) {
 	return ss.GetFunc(sid)
 }
 
-func (ss *MockSessionStorage) Destroy(sid string) error {
-	return ss.DestroyFunc(sid)
+func (ss *MockSessionStorage) Delete(sid string) error {
+	return ss.DeleteFunc(sid)
 }
 
 func TestSessionInit(t *testing.T) {
@@ -186,16 +180,15 @@ func TestSessionDestroy(t *testing.T) {
 
 	provider := session.NewProvider(sessionBuilder, sessionStorage)
 
-	t.Run("set session to be destroyed", func(t *testing.T) {
+	t.Run("destroys session", func(t *testing.T) {
 		sid := "17af454"
 		err := provider.SessionDestroy(sid)
 
 		assertNoError(t, err)
 
-		sess := sessionStorage.sessions[sid]
-		assertContains(t, sessionStorage.destroyed, sess, func(a, b session.ISession) bool {
-			return a.SessionID() == b.SessionID()
-		})
+		if _, ok := sessionStorage.sessions[sid]; ok {
+			t.Fatalf("didn't destroy session")
+		}
 	})
 	t.Run("returns error for destroy failing", func(t *testing.T) {
 		provider := session.NewProvider(&StubSessionBuilder{}, &StubFailingSessionStorage{})
@@ -224,16 +217,4 @@ func assertError(t testing.TB, got, want error) {
 	if got != want {
 		t.Fatalf(`got error "%v" but want "%v"`, got, want)
 	}
-}
-
-func assertContains[T any](t testing.TB, haystack []T, v T, predicate func(a, b T) bool) {
-	t.Helper()
-
-	for _, o := range haystack {
-		if predicate(o, v) {
-			return
-		}
-	}
-
-	t.Fatalf("didn't contains %v in %+v", v, haystack)
 }

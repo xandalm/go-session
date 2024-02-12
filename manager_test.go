@@ -38,7 +38,6 @@ func (s *StubSession) SessionID() string {
 
 type StubProvider struct {
 	sessions map[string]session.ISession
-	doomed   []session.ISession
 }
 
 func (p *StubProvider) SessionInit(sid string) (session.ISession, error) {
@@ -58,7 +57,7 @@ func (p *StubProvider) SessionRead(sid string) (session.ISession, error) {
 }
 
 func (p *StubProvider) SessionDestroy(sid string) error {
-	p.doomed = append(p.doomed, p.sessions[sid])
+	delete(p.sessions, sid)
 	return nil
 }
 
@@ -133,7 +132,10 @@ func TestManager(t *testing.T) {
 		manager.DestroySession(res, req)
 
 		sid, _ := url.QueryUnescape(cookie.Value)
-		assertSessionIsDoomed(t, provider, sid)
+
+		if _, ok := provider.sessions[sid]; ok {
+			t.Fatalf("didn't destroy session")
+		}
 
 		newCookie := parseCookie(getCookieFromResponse(res))
 		assertNotNil(t, newCookie)
@@ -165,22 +167,6 @@ func assertEqual(t testing.TB, a, b string) {
 
 	if a != b {
 		t.Fatalf("expected same values, but got %v and %v", a, b)
-	}
-}
-
-func assertSessionIsDoomed(t testing.TB, provider *StubProvider, sid string) {
-	t.Helper()
-
-	doomed := false
-	for _, d := range provider.doomed {
-		if d.SessionID() == sid {
-			doomed = true
-			break
-		}
-	}
-
-	if !doomed {
-		t.Fatal("didn't set session to be removed from provider")
 	}
 }
 
