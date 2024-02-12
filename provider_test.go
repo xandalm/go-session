@@ -70,6 +70,11 @@ func TestSessionInit(t *testing.T) {
 
 		assertError(t, err, session.ErrEmptySessionId)
 	})
+	t.Run("returns error for duplicated sid", func(t *testing.T) {
+		_, err := provider.SessionInit("17af454")
+
+		assertError(t, err, session.ErrDuplicateSessionId)
+	})
 }
 
 func TestSessionRead(t *testing.T) {
