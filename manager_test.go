@@ -1,4 +1,4 @@
-package session
+package session_test
 
 import (
 	"net/http"
@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/xandalm/go-session"
 )
 
 type StubSession struct {
@@ -31,13 +33,13 @@ func (s *StubSession) SessionID() string {
 }
 
 type StubProvider struct {
-	sessions map[string]Session
-	doomed   []Session
+	sessions map[string]session.ISession
+	doomed   []session.ISession
 }
 
-func (p *StubProvider) SessionInit(sid string) (Session, error) {
+func (p *StubProvider) SessionInit(sid string) (session.ISession, error) {
 	if p.sessions == nil {
-		p.sessions = make(map[string]Session)
+		p.sessions = make(map[string]session.ISession)
 	}
 	sess := &StubSession{
 		id: sid,
@@ -46,7 +48,7 @@ func (p *StubProvider) SessionInit(sid string) (Session, error) {
 	return sess, nil
 }
 
-func (p *StubProvider) SessionRead(sid string) (Session, error) {
+func (p *StubProvider) SessionRead(sid string) (session.ISession, error) {
 	sess := p.sessions[sid]
 	return sess, nil
 }
@@ -63,7 +65,7 @@ var dummySite = "http://site.com"
 func TestManager(t *testing.T) {
 	cookieName := "SessionID"
 	provider := &StubProvider{}
-	manager := NewManager(provider, cookieName, 3600)
+	manager := session.NewManager(provider, cookieName, 3600)
 
 	assertNotNil(t, manager)
 
