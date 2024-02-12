@@ -2,6 +2,7 @@ package session_test
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/xandalm/go-session"
@@ -17,7 +18,8 @@ func (sb *StubSessionBuilder) Build(sid string) session.ISession {
 }
 
 type StubSessionStorage struct {
-	sessions map[string]session.ISession
+	sessions  map[string]session.ISession
+	destroyed []session.ISession
 }
 
 func (ss *StubSessionStorage) Save(sess session.ISession) error {
@@ -33,6 +35,15 @@ func (ss *StubSessionStorage) Get(sid string) (session.ISession, error) {
 	return sess, nil
 }
 
+func (ss *StubSessionStorage) Destroy(sid string) error {
+	sess, ok := ss.sessions[sid]
+	if !ok {
+		return fmt.Errorf("unknown sid")
+	}
+	ss.destroyed = append(ss.destroyed, sess)
+	return nil
+}
+
 type StubFailingSessionStorage struct {
 	sessions map[string]session.ISession
 }
@@ -45,6 +56,10 @@ func (ss *StubFailingSessionStorage) Save(sess session.ISession) error {
 
 func (ss *StubFailingSessionStorage) Get(sid string) (session.ISession, error) {
 	return nil, errFoo
+}
+
+func (ss *StubFailingSessionStorage) Destroy(sid string) error {
+	return errFoo
 }
 
 func TestSessionInit(t *testing.T) {
@@ -125,6 +140,32 @@ func TestSessionRead(t *testing.T) {
 	})
 }
 
+func TestSessionDestroy(t *testing.T) {
+
+	sessionBuilder := &StubSessionBuilder{}
+	sessionStorage := &StubSessionStorage{
+		sessions: map[string]session.ISession{
+			"17af454": &StubSession{
+				id: "17af454",
+			},
+		},
+	}
+
+	provider := session.NewProvider(sessionBuilder, sessionStorage)
+
+	t.Run("set session to be destroyed", func(t *testing.T) {
+		sid := "17af454"
+		err := provider.SessionDestroy(sid)
+
+		assertNoError(t, err)
+
+		sess := sessionStorage.sessions[sid]
+		assertContains(t, sessionStorage.destroyed, sess, func(a, b session.ISession) bool {
+			return a.SessionID() == b.SessionID()
+		})
+	})
+}
+
 func assertNoError(t testing.TB, err error) {
 	t.Helper()
 
@@ -143,4 +184,16 @@ func assertError(t testing.TB, got, want error) {
 	if got != want {
 		t.Fatalf("got error %v but want %v", got, want)
 	}
+}
+
+func assertContains[T any](t testing.TB, haystack []T, v T, predicate func(a, b T) bool) {
+	t.Helper()
+
+	for _, o := range haystack {
+		if predicate(o, v) {
+			return
+		}
+	}
+
+	t.Fatalf("didn't contains %v in %+v", v, haystack)
 }
