@@ -3,7 +3,7 @@ package session
 import "errors"
 
 var (
-	ErrInvalidKeyType error = errors.New("session: key type must be string type")
+	ErrNilValueNotAllowed error = errors.New("session: stores nil values into session is not allowed")
 )
 
 type Session struct {
@@ -12,6 +12,9 @@ type Session struct {
 }
 
 func (s *Session) Set(key string, value any) error {
+	if value == nil {
+		return ErrNilValueNotAllowed
+	}
 	s.v[key] = value
 	return nil
 }

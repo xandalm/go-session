@@ -32,22 +32,35 @@ func TestSessionID(t *testing.T) {
 }
 
 func TestSet(t *testing.T) {
-	t.Run("set value to the key", func(t *testing.T) {
-		sess := &Session{
-			id: "1",
-			v:  map[string]any{},
-		}
+	cases := []struct {
+		tname string
+		key   string
+		value any
+		err   error
+	}{
+		{"set value to the key", "A", "value", nil},
+		{"returns error for nil value", "B", nil, ErrNilValueNotAllowed},
+	}
 
-		key := "A"
-		value := "value"
-		err := sess.Set(key, value)
+	sess := &Session{
+		id: "1",
+		v:  map[string]any{},
+	}
 
-		assert.NoError(t, err)
+	for _, c := range cases {
+		t.Run(c.tname, func(t *testing.T) {
+			err := sess.Set(c.key, c.value)
 
-		if sess.v[key] != value {
-			t.Errorf("expected %s to hold %q, but got %q", key, value, sess.v[key])
-		}
-	})
+			if c.err == nil {
+				assert.NoError(t, err)
+				if sess.v[c.key] != c.value {
+					t.Errorf("expected %s to hold %q, but got %q", c.key, c.value, sess.v[c.key])
+				}
+			} else {
+				assert.Error(t, err, c.err)
+			}
+		})
+	}
 }
 
 func TestGet(t *testing.T) {
