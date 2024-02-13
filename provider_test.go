@@ -19,8 +19,8 @@ func TestSessionInit(t *testing.T) {
 		sid := "17af454"
 		session, err := provider.SessionInit(sid)
 
-		assert.AssertNoError(t, err)
-		assert.AssertNotNil(t, session)
+		assert.NoError(t, err)
+		assert.NotNil(t, session)
 
 		if _, ok := sessionStorage.Sessions[sid]; !ok {
 			t.Error("didn't stores the session")
@@ -30,12 +30,12 @@ func TestSessionInit(t *testing.T) {
 
 		_, err := provider.SessionInit("")
 
-		assert.AssertError(t, err, ErrEmptySessionId)
+		assert.Error(t, err, ErrEmptySessionId)
 	})
 	t.Run("returns error for duplicated sid", func(t *testing.T) {
 		_, err := provider.SessionInit("17af454")
 
-		assert.AssertError(t, err, ErrDuplicateSessionId)
+		assert.Error(t, err, ErrDuplicateSessionId)
 	})
 	t.Run("returns error for inability to ensure non-duplicity", func(t *testing.T) {
 		sessionStorage := &stubFailingSessionStorage{
@@ -49,7 +49,7 @@ func TestSessionInit(t *testing.T) {
 
 		_, err := provider.SessionInit("17af454")
 
-		assert.AssertError(t, err, ErrUnableToEnsureNonDuplicity)
+		assert.Error(t, err, ErrUnableToEnsureNonDuplicity)
 	})
 	t.Run("returns error for storage save failure", func(t *testing.T) {
 		sessionStorage := &mockSessionStorage{
@@ -61,7 +61,7 @@ func TestSessionInit(t *testing.T) {
 
 		_, err := provider.SessionInit("17af450")
 
-		assert.AssertError(t, err, ErrUnableToSaveSession)
+		assert.Error(t, err, ErrUnableToSaveSession)
 	})
 }
 
@@ -82,8 +82,8 @@ func TestSessionRead(t *testing.T) {
 		sid := "17af454"
 		session, err := provider.SessionRead(sid)
 
-		assert.AssertNoError(t, err)
-		assert.AssertNotNil(t, session)
+		assert.NoError(t, err)
+		assert.NotNil(t, session)
 
 		if session.SessionID() != sid {
 			t.Errorf("didn't get expected session, got %s but want %s", session.SessionID(), sid)
@@ -94,7 +94,7 @@ func TestSessionRead(t *testing.T) {
 
 		_, err := provider.SessionRead("17af454")
 
-		assert.AssertError(t, err, ErrRestoringSession)
+		assert.Error(t, err, ErrRestoringSession)
 	})
 }
 
@@ -115,7 +115,7 @@ func TestSessionDestroy(t *testing.T) {
 		sid := "17af454"
 		err := provider.SessionDestroy(sid)
 
-		assert.AssertNoError(t, err)
+		assert.NoError(t, err)
 
 		if _, ok := sessionStorage.Sessions[sid]; ok {
 			t.Fatalf("didn't destroy session")
@@ -126,7 +126,7 @@ func TestSessionDestroy(t *testing.T) {
 
 		err := provider.SessionDestroy("17af454")
 
-		assert.AssertError(t, err, ErrUnableToDestroySession)
+		assert.Error(t, err, ErrUnableToDestroySession)
 	})
 }
 

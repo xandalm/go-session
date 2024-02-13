@@ -14,7 +14,7 @@ func TestSessionBuilder(t *testing.T) {
 		sid := "1"
 		sess := builder.Build(sid, storage.Save)
 
-		assert.AssertNotNil(t, sess)
+		assert.NotNil(t, sess)
 	})
 }
 
@@ -25,9 +25,9 @@ func TestSessionID(t *testing.T) {
 		sid := "1"
 		got := builder.Build(sid, storage.Save)
 
-		assert.AssertNotNil(t, got)
+		assert.NotNil(t, got)
 
-		assert.AssertEqual(t, got.SessionID(), sid)
+		assert.Equal(t, got.SessionID(), sid)
 	})
 }
 
@@ -42,7 +42,7 @@ func TestSet(t *testing.T) {
 		value := "value"
 		err := sess.Set(key, value)
 
-		assert.AssertNoError(t, err)
+		assert.NoError(t, err)
 
 		if sess.v[key] != value {
 			t.Errorf("expected %s to hold %q, but got %q", key, value, sess.v[key])
@@ -64,7 +64,7 @@ func TestGet(t *testing.T) {
 
 		got := sess.Get(key)
 
-		assert.AssertNotNil(t, got)
-		assert.AssertEqual(t, got.(string), value)
+		assert.NotNil(t, got)
+		assert.Equal(t, got.(string), value)
 	})
 }

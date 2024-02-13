@@ -19,7 +19,7 @@ func TestManager(t *testing.T) {
 	provider := &stubProvider{}
 	manager := NewManager(provider, cookieName, 3600)
 
-	assert.AssertNotNil(t, manager)
+	assert.NotNil(t, manager)
 
 	var cookie *http.Cookie = nil
 
@@ -45,17 +45,17 @@ func TestManager(t *testing.T) {
 		res := httptest.NewRecorder()
 
 		session := manager.StartSession(res, req)
-		assert.AssertNotNil(t, session)
+		assert.NotNil(t, session)
 
 		cookie = parseCookie(getCookieFromResponse(res))
-		assert.AssertNotNil(t, cookie)
+		assert.NotNil(t, cookie)
 		cookie.Name = cookieName
 
 		sid := cookie.Value
 
-		assert.AssertNotEmpty(t, sid)
+		assert.NotEmpty(t, sid)
 
-		assert.AssertEqual(t, sid, url.QueryEscape(session.SessionID()))
+		assert.Equal(t, sid, url.QueryEscape(session.SessionID()))
 	})
 
 	t.Run("restores the same session", func(t *testing.T) {
@@ -66,9 +66,9 @@ func TestManager(t *testing.T) {
 		res := httptest.NewRecorder()
 
 		session := manager.StartSession(res, req)
-		assert.AssertNotNil(t, session)
+		assert.NotNil(t, session)
 
-		assert.AssertEqual(t, cookie.Value, url.QueryEscape(session.SessionID()))
+		assert.Equal(t, cookie.Value, url.QueryEscape(session.SessionID()))
 	})
 
 	t.Run("destroy the session", func(t *testing.T) {
@@ -87,7 +87,7 @@ func TestManager(t *testing.T) {
 		}
 
 		newCookie := parseCookie(getCookieFromResponse(res))
-		assert.AssertNotNil(t, newCookie)
+		assert.NotNil(t, newCookie)
 
 		if newCookie.Expires.After(time.Now()) || newCookie.MaxAge != 0 {
 			t.Errorf("the cookie is not expired, Expires = %s and MaxAge = %d", newCookie.Expires, newCookie.MaxAge)

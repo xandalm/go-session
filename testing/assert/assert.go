@@ -2,7 +2,7 @@ package assert
 
 import "testing"
 
-func AssertNotNil(t testing.TB, v any) {
+func NotNil(t testing.TB, v any) {
 	t.Helper()
 
 	if v == nil {
@@ -10,7 +10,7 @@ func AssertNotNil(t testing.TB, v any) {
 	}
 }
 
-func AssertNotEmpty(t testing.TB, v string) {
+func NotEmpty(t testing.TB, v string) {
 	t.Helper()
 
 	if v == "" {
@@ -18,7 +18,7 @@ func AssertNotEmpty(t testing.TB, v string) {
 	}
 }
 
-func AssertEqual[T comparable](t testing.TB, got, want T) {
+func Equal[T comparable](t testing.TB, got, want T) {
 	t.Helper()
 
 	if got != want {
@@ -26,7 +26,7 @@ func AssertEqual[T comparable](t testing.TB, got, want T) {
 	}
 }
 
-func AssertNoError(t testing.TB, err error) {
+func NoError(t testing.TB, err error) {
 	t.Helper()
 
 	if err != nil {
@@ -34,7 +34,7 @@ func AssertNoError(t testing.TB, err error) {
 	}
 }
 
-func AssertError(t testing.TB, got, want error) {
+func Error(t testing.TB, got, want error) {
 	t.Helper()
 
 	if got == nil {
