@@ -13,8 +13,9 @@ import (
 )
 
 type StubSession struct {
-	id       string
-	onUpdate func(session.ISession) error
+	id        string
+	createdAt time.Time
+	onUpdate  func(session.ISession) error
 }
 
 func (s *StubSession) Set(key, value any) error {

@@ -3,13 +3,14 @@ package session
 import "errors"
 
 type SessionBuilder interface {
-	Build(sid string, onUpdate func(ISession) error) ISession
+	Build(sid string, onSessionUpdate func(ISession) error) ISession
 }
 
 type SessionStorage interface {
 	Save(ISession) error
 	Get(sid string) (ISession, error)
-	Delete(sid string) error
+	Rip(sid string) error
+	Reap(maxAge int64)
 }
 
 type Provider struct {
@@ -68,7 +69,7 @@ func (p *Provider) SessionRead(sid string) (ISession, error) {
 }
 
 func (p *Provider) SessionDestroy(sid string) error {
-	err := p.storage.Delete(sid)
+	err := p.storage.Rip(sid)
 	if err != nil {
 		return ErrUnableToDestroySession
 	}
@@ -76,4 +77,5 @@ func (p *Provider) SessionDestroy(sid string) error {
 }
 
 func (p *Provider) SessionGC(maxAge int64) {
+	p.storage.Reap(maxAge)
 }
