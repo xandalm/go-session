@@ -2,7 +2,7 @@ package session
 
 import "errors"
 
-type SessionBuilder interface {
+type ISessionBuilder interface {
 	Build(sid string, onSessionUpdate func(ISession) error) ISession
 }
 
@@ -14,11 +14,11 @@ type SessionStorage interface {
 }
 
 type Provider struct {
-	builder SessionBuilder
+	builder ISessionBuilder
 	storage SessionStorage
 }
 
-func NewProvider(builder SessionBuilder, storage SessionStorage) *Provider {
+func NewProvider(builder ISessionBuilder, storage SessionStorage) *Provider {
 	return &Provider{
 		builder,
 		storage,
