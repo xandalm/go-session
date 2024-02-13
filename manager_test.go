@@ -1,4 +1,4 @@
-package session_test
+package session
 
 import (
 	"net/http"
@@ -9,69 +9,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xandalm/go-session"
+	"github.com/xandalm/go-session/testing/assert"
 )
-
-type StubSession struct {
-	id        string
-	createdAt time.Time
-	onUpdate  func(session.ISession) error
-}
-
-func (s *StubSession) Set(key, value any) error {
-	s.onUpdate(s)
-	return nil
-}
-
-func (s *StubSession) Get(key any) any {
-	s.onUpdate(s)
-	return nil
-}
-
-func (s *StubSession) Delete(key any) error {
-	s.onUpdate(s)
-	return nil
-}
-
-func (s *StubSession) SessionID() string {
-	return s.id
-}
-
-type StubProvider struct {
-	sessions map[string]session.ISession
-}
-
-func (p *StubProvider) SessionInit(sid string) (session.ISession, error) {
-	if p.sessions == nil {
-		p.sessions = make(map[string]session.ISession)
-	}
-	sess := &StubSession{
-		id: sid,
-	}
-	p.sessions[sid] = sess
-	return sess, nil
-}
-
-func (p *StubProvider) SessionRead(sid string) (session.ISession, error) {
-	sess := p.sessions[sid]
-	return sess, nil
-}
-
-func (p *StubProvider) SessionDestroy(sid string) error {
-	delete(p.sessions, sid)
-	return nil
-}
-
-func (p *StubProvider) SessionGC(maxLifeTime int64) {}
 
 var dummySite = "http://site.com"
 
 func TestManager(t *testing.T) {
 	cookieName := "SessionID"
-	provider := &StubProvider{}
-	manager := session.NewManager(provider, cookieName, 3600)
+	provider := &stubProvider{}
+	manager := NewManager(provider, cookieName, 3600)
 
-	assertNotNil(t, manager)
+	assert.AssertNotNil(t, manager)
 
 	var cookie *http.Cookie = nil
 
@@ -97,17 +45,17 @@ func TestManager(t *testing.T) {
 		res := httptest.NewRecorder()
 
 		session := manager.StartSession(res, req)
-		assertNotNil(t, session)
+		assert.AssertNotNil(t, session)
 
 		cookie = parseCookie(getCookieFromResponse(res))
-		assertNotNil(t, cookie)
+		assert.AssertNotNil(t, cookie)
 		cookie.Name = cookieName
 
 		sid := cookie.Value
 
-		assertNotEmpty(t, sid)
+		assert.AssertNotEmpty(t, sid)
 
-		assertEqual(t, sid, url.QueryEscape(session.SessionID()))
+		assert.AssertEqual(t, sid, url.QueryEscape(session.SessionID()))
 	})
 
 	t.Run("restores the same session", func(t *testing.T) {
@@ -118,9 +66,9 @@ func TestManager(t *testing.T) {
 		res := httptest.NewRecorder()
 
 		session := manager.StartSession(res, req)
-		assertNotNil(t, session)
+		assert.AssertNotNil(t, session)
 
-		assertEqual(t, cookie.Value, url.QueryEscape(session.SessionID()))
+		assert.AssertEqual(t, cookie.Value, url.QueryEscape(session.SessionID()))
 	})
 
 	t.Run("destroy the session", func(t *testing.T) {
@@ -134,41 +82,17 @@ func TestManager(t *testing.T) {
 
 		sid, _ := url.QueryUnescape(cookie.Value)
 
-		if _, ok := provider.sessions[sid]; ok {
+		if _, ok := provider.Sessions[sid]; ok {
 			t.Fatalf("didn't destroy session")
 		}
 
 		newCookie := parseCookie(getCookieFromResponse(res))
-		assertNotNil(t, newCookie)
+		assert.AssertNotNil(t, newCookie)
 
 		if newCookie.Expires.After(time.Now()) || newCookie.MaxAge != 0 {
 			t.Errorf("the cookie is not expired, Expires = %s and MaxAge = %d", newCookie.Expires, newCookie.MaxAge)
 		}
 	})
-}
-
-func assertNotNil(t testing.TB, v any) {
-	t.Helper()
-
-	if v == nil {
-		t.Fatal("expected not nil")
-	}
-}
-
-func assertNotEmpty(t testing.TB, v string) {
-	t.Helper()
-
-	if v == "" {
-		t.Fatalf("expected not empty")
-	}
-}
-
-func assertEqual(t testing.TB, got, want string) {
-	t.Helper()
-
-	if got != want {
-		t.Fatalf("expected same values, but got %q and want %q", got, want)
-	}
 }
 
 func getCookieFromResponse(res *httptest.ResponseRecorder) (cookie map[string]string) {
