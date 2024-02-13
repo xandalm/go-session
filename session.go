@@ -17,7 +17,7 @@ func (s *Session) Set(key string, value any) error {
 }
 
 func (s *Session) Get(key string) any {
-	return nil
+	return s.v[key]
 }
 
 func (s *Session) Delete(key string) error {
