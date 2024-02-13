@@ -11,9 +11,9 @@ import (
 )
 
 type ISession interface {
-	Set(key, value any) error
-	Get(key any) any
-	Delete(key any) error
+	Set(key string, value any) error
+	Get(key string) any
+	Delete(key string) error
 	SessionID() string
 }
 

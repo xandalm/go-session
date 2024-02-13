@@ -30,3 +30,22 @@ func TestSessionID(t *testing.T) {
 		assert.AssertEqual(t, got.SessionID(), sid)
 	})
 }
+
+func TestSet(t *testing.T) {
+	builder := &SessionBuilder{}
+	storage := &stubSessionStorage{}
+	sess := builder.Build("1", storage.Save)
+	assert.AssertNotNil(t, sess)
+	t.Run("sets session value", func(t *testing.T) {
+		key := "A"
+		value := "value"
+		err := sess.Set(key, value)
+
+		assert.AssertNoError(t, err)
+
+		resess := sess.(*Session)
+		if resess.v[key] != value {
+			t.Errorf("expected %s to hold %q, but got %q", key, value, resess.v[key])
+		}
+	})
+}

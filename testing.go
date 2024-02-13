@@ -11,17 +11,17 @@ type stubSession struct {
 	OnUpdate  func(ISession) error
 }
 
-func (s *stubSession) Set(key, value any) error {
+func (s *stubSession) Set(key string, value any) error {
 	s.OnUpdate(s)
 	return nil
 }
 
-func (s *stubSession) Get(key any) any {
+func (s *stubSession) Get(key string) any {
 	s.OnUpdate(s)
 	return nil
 }
 
-func (s *stubSession) Delete(key any) error {
+func (s *stubSession) Delete(key string) error {
 	s.OnUpdate(s)
 	return nil
 }
