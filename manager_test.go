@@ -163,11 +163,11 @@ func assertNotEmpty(t testing.TB, v string) {
 	}
 }
 
-func assertEqual(t testing.TB, a, b string) {
+func assertEqual(t testing.TB, got, want string) {
 	t.Helper()
 
-	if a != b {
-		t.Fatalf("expected same values, but got %v and %v", a, b)
+	if got != want {
+		t.Fatalf("expected same values, but got %q and want %q", got, want)
 	}
 }
 
