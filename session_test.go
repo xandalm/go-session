@@ -81,3 +81,22 @@ func TestGet(t *testing.T) {
 		assert.Equal(t, got.(string), value)
 	})
 }
+
+func TestDelete(t *testing.T) {
+	t.Run("remove a pair from session map", func(t *testing.T) {
+		sess := &Session{
+			id: "1",
+			v: map[string]any{
+				"key": "value",
+			},
+		}
+
+		err := sess.Delete("key")
+
+		assert.NoError(t, err)
+
+		if _, ok := sess.v["key"]; ok {
+			t.Errorf("didn't remove pair from session map")
+		}
+	})
+}

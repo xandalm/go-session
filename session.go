@@ -24,6 +24,7 @@ func (s *Session) Get(key string) any {
 }
 
 func (s *Session) Delete(key string) error {
+	delete(s.v, key)
 	return nil
 }
 
