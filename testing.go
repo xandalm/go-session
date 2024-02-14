@@ -30,6 +30,10 @@ func (s *stubSession) SessionID() string {
 	return s.Id
 }
 
+func (s *stubSession) CreationTime() time.Time {
+	return s.CreatedAt
+}
+
 type stubProvider struct {
 	Sessions map[string]ISession
 }

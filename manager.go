@@ -15,6 +15,7 @@ type ISession interface {
 	Get(key string) any
 	Delete(key string) error
 	SessionID() string
+	CreationTime() time.Time
 }
 
 type IProvider interface {

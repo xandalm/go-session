@@ -2,6 +2,7 @@ package session
 
 import (
 	"testing"
+	"time"
 
 	"github.com/xandalm/go-session/testing/assert"
 )
@@ -19,15 +20,22 @@ func TestSessionBuilder(t *testing.T) {
 }
 
 func TestSessionID(t *testing.T) {
-	builder := &SessionBuilder{}
-	storage := &stubSessionStorage{}
 	t.Run("returns session id", func(t *testing.T) {
+
 		sid := "1"
-		got := builder.Build(sid, storage.Save)
+		sess := newSession(sid, time.Now(), map[string]any{})
 
-		assert.NotNil(t, got)
+		assert.Equal(t, sess.SessionID(), sid)
+	})
+}
 
-		assert.Equal(t, got.SessionID(), sid)
+func TestCreationTime(t *testing.T) {
+	t.Run("returns session creation time", func(t *testing.T) {
+
+		ct := time.Now()
+		sess := newSession("1", ct, map[string]any{})
+
+		assert.Equal(t, sess.CreationTime(), ct)
 	})
 }
 
@@ -42,10 +50,7 @@ func TestSet(t *testing.T) {
 		{"returns error for nil value", "B", nil, ErrNilValueNotAllowed},
 	}
 
-	sess := &Session{
-		id: "1",
-		v:  map[string]any{},
-	}
+	sess := newSession("1", time.Now(), map[string]any{})
 
 	for _, c := range cases {
 		t.Run(c.tname, func(t *testing.T) {
@@ -68,12 +73,7 @@ func TestGet(t *testing.T) {
 		key := "A"
 		value := "value"
 
-		sess := &Session{
-			id: "1",
-			v: map[string]any{
-				key: value,
-			},
-		}
+		sess := newSession("1", time.Now(), map[string]any{key: value})
 
 		got := sess.Get(key)
 
@@ -84,12 +84,8 @@ func TestGet(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	t.Run("remove a pair from session map", func(t *testing.T) {
-		sess := &Session{
-			id: "1",
-			v: map[string]any{
-				"key": "value",
-			},
-		}
+
+		sess := newSession("1", time.Now(), map[string]any{"key": "value"})
 
 		err := sess.Delete("key")
 
