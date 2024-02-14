@@ -16,6 +16,16 @@ func TestSessionBuilder(t *testing.T) {
 		sess := builder.Build(sid, storage.Save)
 
 		assert.NotNil(t, sess)
+
+		resess, ok := sess.(*Session)
+
+		if !ok {
+			t.Fatal("didn't get expected session")
+		}
+
+		assert.Equal(t, resess.id, sid)
+		assert.NotEmpty(t, resess.ct)
+		assert.NotNil(t, resess.v)
 	})
 }
 

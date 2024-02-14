@@ -1,6 +1,9 @@
 package assert
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 func NotNil(t testing.TB, v any) {
 	t.Helper()
@@ -10,12 +13,34 @@ func NotNil(t testing.TB, v any) {
 	}
 }
 
-func NotEmpty(t testing.TB, v string) {
+func NotEmpty[T any](t testing.TB, v T) {
 	t.Helper()
 
-	if v == "" {
-		t.Fatalf("expected not empty")
+	value := reflect.ValueOf(v)
+	kind := value.Kind()
+
+	if kind == reflect.Pointer {
+		value = value.Elem()
+		kind = value.Kind()
 	}
+
+	switch kind {
+	case reflect.Array,
+		reflect.Chan,
+		reflect.Map,
+		reflect.Slice,
+		reflect.String:
+		l := value.Len()
+		if l != 0 {
+			return
+		}
+	default:
+		zeroValue := reflect.Zero(reflect.TypeOf(value))
+		if !reflect.DeepEqual(zeroValue, value) {
+			return
+		}
+	}
+	t.Fatalf("expected not empty")
 }
 
 func Equal[T comparable](t testing.TB, got, want T) {
