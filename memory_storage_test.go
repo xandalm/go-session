@@ -52,3 +52,24 @@ func TestMemoryStorage_Get(t *testing.T) {
 		assert.Equal(t, resess, sess)
 	})
 }
+
+func TestMemoryStorage_Rip(t *testing.T) {
+	t.Run("remove session from storage", func(t *testing.T) {
+
+		sid := "1"
+		sess := newStubSession(sid, time.Now(), dummyFn)
+		storage := &MemoryStorage{
+			sessions: map[string]ISession{
+				sid: sess,
+			},
+		}
+
+		err := storage.Rip(sid)
+
+		assert.NoError(t, err)
+
+		if _, ok := storage.sessions[sid]; ok {
+			t.Error("didn't remove session")
+		}
+	})
+}

@@ -17,3 +17,8 @@ func (s *MemoryStorage) Save(sess ISession) error {
 func (s *MemoryStorage) Get(sid string) (ISession, error) {
 	return s.sessions[sid], nil
 }
+
+func (s *MemoryStorage) Rip(sid string) error {
+	delete(s.sessions, sid)
+	return nil
+}
