@@ -5,9 +5,6 @@ type MemoryStorage struct {
 }
 
 func (s *MemoryStorage) Save(sess ISession) error {
-	if sid := sess.SessionID(); sid != "" {
-		s.sessions[sess.SessionID()] = sess
-		return nil
-	}
-	return ErrEmptySessionId
+	s.sessions[sess.SessionID()] = sess
+	return nil
 }

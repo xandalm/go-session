@@ -23,11 +23,4 @@ func TestSave(t *testing.T) {
 			t.Errorf("didn't save session")
 		}
 	})
-	t.Run("returns error for empty session id", func(t *testing.T) {
-		sess := &stubSession{}
-
-		err := storage.Save(sess)
-
-		assert.Error(t, err, ErrEmptySessionId)
-	})
 }
