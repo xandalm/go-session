@@ -11,6 +11,14 @@ type stubSession struct {
 	OnUpdate  func(ISession) error
 }
 
+func newStubSession(id string, t time.Time, onUpdate func(ISession) error) *stubSession {
+	return &stubSession{
+		Id:        id,
+		CreatedAt: t,
+		OnUpdate:  onUpdate,
+	}
+}
+
 func (s *stubSession) Set(key string, value any) error {
 	s.OnUpdate(s)
 	return nil
