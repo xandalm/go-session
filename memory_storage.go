@@ -6,19 +6,19 @@ import (
 
 type MemoryStorage struct {
 	mu       sync.Mutex
-	sessions map[string]ISession
-	list     []ISession
+	sessions map[string]Session
+	list     []Session
 }
 
-func NewMemoryStorage(sessions map[string]ISession, list []ISession) *MemoryStorage {
+func NewMemoryStorage() *MemoryStorage {
 	return &MemoryStorage{
 		sync.Mutex{},
-		sessions,
-		list,
+		make(map[string]Session),
+		make([]Session, 0),
 	}
 }
 
-func (s *MemoryStorage) Save(sess ISession) error {
+func (s *MemoryStorage) Save(sess Session) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.sessions[sess.SessionID()] = sess
@@ -26,7 +26,7 @@ func (s *MemoryStorage) Save(sess ISession) error {
 	return nil
 }
 
-func (s *MemoryStorage) Get(sid string) (ISession, error) {
+func (s *MemoryStorage) Get(sid string) (Session, error) {
 	return s.sessions[sid], nil
 }
 

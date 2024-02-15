@@ -9,17 +9,17 @@ var (
 	ErrNilValueNotAllowed error = errors.New("session: stores nil values into session is not allowed")
 )
 
-type Session struct {
+type DefaultSession struct {
 	id string
 	ct time.Time
 	v  map[string]any
 }
 
-func newSession(id string, ct time.Time, v map[string]any) *Session {
-	return &Session{id, ct, v}
+func newDefaultSession(id string, ct time.Time, v map[string]any) *DefaultSession {
+	return &DefaultSession{id, ct, v}
 }
 
-func (s *Session) Set(key string, value any) error {
+func (s *DefaultSession) Set(key string, value any) error {
 	if value == nil {
 		return ErrNilValueNotAllowed
 	}
@@ -27,28 +27,30 @@ func (s *Session) Set(key string, value any) error {
 	return nil
 }
 
-func (s *Session) Get(key string) any {
+func (s *DefaultSession) Get(key string) any {
 	return s.v[key]
 }
 
-func (s *Session) Delete(key string) error {
+func (s *DefaultSession) Delete(key string) error {
 	delete(s.v, key)
 	return nil
 }
 
-func (s *Session) SessionID() string {
+func (s *DefaultSession) SessionID() string {
 	return s.id
 }
 
-func (s *Session) CreationTime() time.Time {
+func (s *DefaultSession) CreationTime() time.Time {
 	return s.ct
 }
 
-type SessionBuilder struct{}
+type defaultSessionBuilder struct{}
 
-func (sb *SessionBuilder) Build(sid string, onSessionUpdate func(sess ISession) error) ISession {
-	return &Session{
+func (sb *defaultSessionBuilder) Build(sid string, onSessionUpdate func(sess Session) error) Session {
+	return &DefaultSession{
 		id: sid,
 		v:  make(map[string]any),
 	}
 }
+
+var DefaultSessionBuilder SessionBuilder = &defaultSessionBuilder{}

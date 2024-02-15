@@ -16,7 +16,7 @@ func TestSessionInit(t *testing.T) {
 	sessionBuilder := &stubSessionBuilder{}
 	sessionStorage := &stubSessionStorage{}
 
-	provider := NewProvider(sessionBuilder, sessionStorage, dummyAdapter)
+	provider := &DefaultProvider{sessionBuilder, sessionStorage, dummyAdapter}
 
 	t.Run("init, store and returns session", func(t *testing.T) {
 
@@ -43,13 +43,13 @@ func TestSessionInit(t *testing.T) {
 	})
 	t.Run("returns error for inability to ensure non-duplicity", func(t *testing.T) {
 		sessionStorage := &stubFailingSessionStorage{
-			Sessions: map[string]ISession{
+			Sessions: map[string]Session{
 				"17af454": &stubSession{
 					Id: "17af454",
 				},
 			},
 		}
-		provider := NewProvider(sessionBuilder, sessionStorage, dummyAdapter)
+		provider := &DefaultProvider{sessionBuilder, sessionStorage, dummyAdapter}
 
 		_, err := provider.SessionInit("17af454")
 
@@ -57,11 +57,11 @@ func TestSessionInit(t *testing.T) {
 	})
 	t.Run("returns error for storage save failure", func(t *testing.T) {
 		sessionStorage := &mockSessionStorage{
-			Sessions: map[string]ISession{},
-			GetFunc:  func(sid string) (ISession, error) { return nil, nil },
-			SaveFunc: func(sess ISession) error { return ErrFoo },
+			Sessions: map[string]Session{},
+			GetFunc:  func(sid string) (Session, error) { return nil, nil },
+			SaveFunc: func(sess Session) error { return errFoo },
 		}
-		provider := NewProvider(sessionBuilder, sessionStorage, dummyAdapter)
+		provider := &DefaultProvider{sessionBuilder, sessionStorage, dummyAdapter}
 
 		_, err := provider.SessionInit("17af450")
 
@@ -73,14 +73,14 @@ func TestSessionRead(t *testing.T) {
 
 	sessionBuilder := &stubSessionBuilder{}
 	sessionStorage := &stubSessionStorage{
-		Sessions: map[string]ISession{
+		Sessions: map[string]Session{
 			"17af454": &stubSession{
 				Id: "17af454",
 			},
 		},
 	}
 
-	provider := NewProvider(sessionBuilder, sessionStorage, dummyAdapter)
+	provider := &DefaultProvider{sessionBuilder, sessionStorage, dummyAdapter}
 
 	t.Run("returns stored session", func(t *testing.T) {
 		sid := "17af454"
@@ -94,11 +94,13 @@ func TestSessionRead(t *testing.T) {
 		}
 	})
 	t.Run("returns error on failing session restoration", func(t *testing.T) {
-		provider := NewProvider(&stubSessionBuilder{}, &stubFailingSessionStorage{}, dummyAdapter)
+		sessionBuilder := &stubSessionBuilder{}
+		sessionStorage := &stubFailingSessionStorage{}
+		provider := &DefaultProvider{sessionBuilder, sessionStorage, dummyAdapter}
 
 		_, err := provider.SessionRead("17af454")
 
-		assert.Error(t, err, ErrRestoringSession)
+		assert.Error(t, err, ErrUnableToRestoreSession)
 	})
 }
 
@@ -106,14 +108,14 @@ func TestSessionDestroy(t *testing.T) {
 
 	sessionBuilder := &stubSessionBuilder{}
 	sessionStorage := &stubSessionStorage{
-		Sessions: map[string]ISession{
+		Sessions: map[string]Session{
 			"17af454": &stubSession{
 				Id: "17af454",
 			},
 		},
 	}
 
-	provider := NewProvider(sessionBuilder, sessionStorage, dummyAdapter)
+	provider := &DefaultProvider{sessionBuilder, sessionStorage, dummyAdapter}
 
 	t.Run("destroys session", func(t *testing.T) {
 		sid := "17af454"
@@ -126,7 +128,9 @@ func TestSessionDestroy(t *testing.T) {
 		}
 	})
 	t.Run("returns error for destroy failing", func(t *testing.T) {
-		provider := NewProvider(&stubSessionBuilder{}, &stubFailingSessionStorage{}, dummyAdapter)
+		sessionBuilder := &stubSessionBuilder{}
+		sessionStorage := &stubFailingSessionStorage{}
+		provider := &DefaultProvider{sessionBuilder, sessionStorage, dummyAdapter}
 
 		err := provider.SessionDestroy("17af454")
 
@@ -143,12 +147,12 @@ func TestSessionGC(t *testing.T) {
 
 		sessionBuilder := &stubSessionBuilder{}
 		sessionStorage := &stubSessionStorage{
-			Sessions: map[string]ISession{},
+			Sessions: map[string]Session{},
 		}
 
-		provider := NewProvider(sessionBuilder, sessionStorage, func(maxAge int64) AgeChecker {
+		provider := &DefaultProvider{sessionBuilder, sessionStorage, func(maxAge int64) AgeChecker {
 			return stubAgeChecker(maxAge)
-		})
+		}}
 
 		sessionStorage.Sessions[sid1] = newStubSession(sid1, time.Now(), nil)
 

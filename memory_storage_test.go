@@ -10,7 +10,10 @@ import (
 func TestMemoryStorage_Save(t *testing.T) {
 	t.Run("save session into storage", func(t *testing.T) {
 
-		storage := NewMemoryStorage(map[string]ISession{}, []ISession{})
+		storage := &MemoryStorage{
+			sessions: map[string]Session{},
+			list:     []Session{},
+		}
 
 		sess := newStubSession("1", time.Now(), dummyFn)
 
@@ -24,14 +27,17 @@ func TestMemoryStorage_Save(t *testing.T) {
 	})
 }
 
-var dummyFn = func(sess ISession) error { return nil }
+var dummyFn = func(sess Session) error { return nil }
 
 func TestMemoryStorage_Get(t *testing.T) {
 	t.Run("restores session from storage", func(t *testing.T) {
 
 		sid := "1"
 		sess := newStubSession(sid, time.Now(), dummyFn)
-		storage := NewMemoryStorage(map[string]ISession{sid: sess}, []ISession{sess})
+		storage := &MemoryStorage{
+			sessions: map[string]Session{sid: sess},
+			list:     []Session{sess},
+		}
 
 		got, err := storage.Get(sid)
 
@@ -53,7 +59,10 @@ func TestMemoryStorage_Rip(t *testing.T) {
 
 		sid := "1"
 		sess := newStubSession(sid, time.Now(), dummyFn)
-		storage := NewMemoryStorage(map[string]ISession{sid: sess}, []ISession{sess})
+		storage := &MemoryStorage{
+			sessions: map[string]Session{sid: sess},
+			list:     []Session{sess},
+		}
 
 		err := storage.Rip(sid)
 
@@ -67,7 +76,10 @@ func TestMemoryStorage_Rip(t *testing.T) {
 
 func TestMemoryStorage_Reap(t *testing.T) {
 	t.Run("remove expired sessions", func(t *testing.T) {
-		storage := NewMemoryStorage(map[string]ISession{}, []ISession{})
+		storage := &MemoryStorage{
+			sessions: map[string]Session{},
+			list:     []Session{},
+		}
 
 		sess1 := newStubSession("1", time.Now(), dummyFn)
 		storage.sessions[sess1.Id] = sess1

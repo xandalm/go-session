@@ -5,31 +5,48 @@ import (
 	"time"
 )
 
-type ISessionBuilder interface {
-	Build(sid string, onSessionUpdate func(ISession) error) ISession
+type SessionBuilder interface {
+	Build(sid string, onSessionUpdate func(Session) error) Session
 }
 
 type AgeChecker interface {
-	ShouldReap(ISession) bool
+	ShouldReap(Session) bool
 }
 
-type SessionStorage interface {
-	Save(ISession) error
-	Get(sid string) (ISession, error)
+type Storage interface {
+	Save(Session) error
+	Get(sid string) (Session, error)
 	Rip(sid string) error
 	Reap(AgeChecker)
 }
 
 type AgeCheckerAdapter func(int64) AgeChecker
 
-type Provider struct {
-	builder           ISessionBuilder
-	storage           SessionStorage
+type secondsAgeChecker int64
+
+func (ma secondsAgeChecker) ShouldReap(sess Session) bool {
+	if sess == nil {
+		panic("session: cannot check age from nil session")
+	}
+	diff := time.Now().Unix() - sess.CreationTime().Unix()
+	return diff >= int64(ma)
+}
+
+var SecondsAgeCheckerAdapter AgeCheckerAdapter = func(maxAge int64) AgeChecker {
+	return secondsAgeChecker(maxAge)
+}
+
+type DefaultProvider struct {
+	builder           SessionBuilder
+	storage           Storage
 	ageCheckerAdapter AgeCheckerAdapter
 }
 
-func NewProvider(builder ISessionBuilder, storage SessionStorage, adapter AgeCheckerAdapter) *Provider {
-	return &Provider{
+func NewDefaultProvider(builder SessionBuilder, storage Storage, adapter AgeCheckerAdapter) *DefaultProvider {
+	if adapter == nil {
+		adapter = SecondsAgeCheckerAdapter
+	}
+	return &DefaultProvider{
 		builder,
 		storage,
 		adapter,
@@ -37,15 +54,15 @@ func NewProvider(builder ISessionBuilder, storage SessionStorage, adapter AgeChe
 }
 
 var (
-	ErrEmptySessionId             error = errors.New("session: the session id cannot be empty")
-	ErrRestoringSession           error = errors.New("session: cannot restore session from storage")
-	ErrDuplicateSessionId         error = errors.New("session: cannot duplicate session id")
-	ErrUnableToEnsureNonDuplicity error = errors.New("session: cannot ensure non duplicity of the sid (storage failure)")
+	ErrEmptySessionId             error = errors.New("session: sid(session id) cannot be empty")
+	ErrDuplicateSessionId         error = errors.New("session: cannot duplicate sid(session id)")
+	ErrUnableToRestoreSession     error = errors.New("session: unable to restore session (storage failure)")
+	ErrUnableToEnsureNonDuplicity error = errors.New("session: unable to ensure non-duplicity of sid (storage failure)")
 	ErrUnableToDestroySession     error = errors.New("session: unable to destroy session (storage failure)")
 	ErrUnableToSaveSession        error = errors.New("session: unable to save session (storage failure)")
 )
 
-func (p *Provider) SessionInit(sid string) (ISession, error) {
+func (p *DefaultProvider) SessionInit(sid string) (Session, error) {
 	if sid == "" {
 		return nil, ErrEmptySessionId
 	}
@@ -63,7 +80,7 @@ func (p *Provider) SessionInit(sid string) (ISession, error) {
 	return sess, nil
 }
 
-func (p *Provider) ensureNonDuplication(sid string) (bool, error) {
+func (p *DefaultProvider) ensureNonDuplication(sid string) (bool, error) {
 	found, err := p.storage.Get(sid)
 	if err != nil {
 		return false, err
@@ -71,15 +88,15 @@ func (p *Provider) ensureNonDuplication(sid string) (bool, error) {
 	return found == nil, nil
 }
 
-func (p *Provider) SessionRead(sid string) (ISession, error) {
+func (p *DefaultProvider) SessionRead(sid string) (Session, error) {
 	sess, err := p.storage.Get(sid)
 	if err != nil {
-		return nil, ErrRestoringSession
+		return nil, ErrUnableToRestoreSession
 	}
 	return sess, nil
 }
 
-func (p *Provider) SessionDestroy(sid string) error {
+func (p *DefaultProvider) SessionDestroy(sid string) error {
 	err := p.storage.Rip(sid)
 	if err != nil {
 		return ErrUnableToDestroySession
@@ -87,16 +104,6 @@ func (p *Provider) SessionDestroy(sid string) error {
 	return nil
 }
 
-func (p *Provider) SessionGC(maxAge int64) {
+func (p *DefaultProvider) SessionGC(maxAge int64) {
 	p.storage.Reap(p.ageCheckerAdapter(maxAge))
-}
-
-type SecondsBasedAgeChecker int64
-
-func (ma SecondsBasedAgeChecker) ShouldReap(sess ISession) bool {
-	if sess == nil {
-		panic("session: cannot check age from nil session")
-	}
-	diff := time.Now().Unix() - sess.CreationTime().Unix()
-	return diff >= int64(ma)
 }

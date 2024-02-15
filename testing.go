@@ -8,10 +8,10 @@ import (
 type stubSession struct {
 	Id        string
 	CreatedAt time.Time
-	OnUpdate  func(ISession) error
+	OnUpdate  func(Session) error
 }
 
-func newStubSession(id string, t time.Time, onUpdate func(ISession) error) *stubSession {
+func newStubSession(id string, t time.Time, onUpdate func(Session) error) *stubSession {
 	return &stubSession{
 		Id:        id,
 		CreatedAt: t,
@@ -43,12 +43,12 @@ func (s *stubSession) CreationTime() time.Time {
 }
 
 type stubProvider struct {
-	Sessions map[string]ISession
+	Sessions map[string]Session
 }
 
-func (p *stubProvider) SessionInit(sid string) (ISession, error) {
+func (p *stubProvider) SessionInit(sid string) (Session, error) {
 	if p.Sessions == nil {
-		p.Sessions = make(map[string]ISession)
+		p.Sessions = make(map[string]Session)
 	}
 	sess := &stubSession{
 		Id: sid,
@@ -57,7 +57,7 @@ func (p *stubProvider) SessionInit(sid string) (ISession, error) {
 	return sess, nil
 }
 
-func (p *stubProvider) SessionRead(sid string) (ISession, error) {
+func (p *stubProvider) SessionRead(sid string) (Session, error) {
 	sess := p.Sessions[sid]
 	return sess, nil
 }
@@ -72,7 +72,7 @@ func (p *stubProvider) SessionGC(maxLifeTime int64) {}
 type stubSessionBuilder struct {
 }
 
-func (sb *stubSessionBuilder) Build(sid string, onSessionUpdate func(ISession) error) ISession {
+func (sb *stubSessionBuilder) Build(sid string, onSessionUpdate func(Session) error) Session {
 	return &stubSession{
 		Id:       sid,
 		OnUpdate: onSessionUpdate,
@@ -80,18 +80,18 @@ func (sb *stubSessionBuilder) Build(sid string, onSessionUpdate func(ISession) e
 }
 
 type stubSessionStorage struct {
-	Sessions map[string]ISession
+	Sessions map[string]Session
 }
 
-func (ss *stubSessionStorage) Save(sess ISession) error {
+func (ss *stubSessionStorage) Save(sess Session) error {
 	if ss.Sessions == nil {
-		ss.Sessions = make(map[string]ISession)
+		ss.Sessions = make(map[string]Session)
 	}
 	ss.Sessions[sess.SessionID()] = sess
 	return nil
 }
 
-func (ss *stubSessionStorage) Get(sid string) (ISession, error) {
+func (ss *stubSessionStorage) Get(sid string) (Session, error) {
 	sess := ss.Sessions[sid]
 	return sess, nil
 }
@@ -110,39 +110,39 @@ func (ss *stubSessionStorage) Reap(checker AgeChecker) {
 }
 
 type stubFailingSessionStorage struct {
-	Sessions map[string]ISession
+	Sessions map[string]Session
 }
 
-var ErrFoo error = errors.New("foo error")
+var errFoo error = errors.New("foo error")
 
-func (ss *stubFailingSessionStorage) Save(sess ISession) error {
-	return ErrFoo
+func (ss *stubFailingSessionStorage) Save(sess Session) error {
+	return errFoo
 }
 
-func (ss *stubFailingSessionStorage) Get(sid string) (ISession, error) {
-	return nil, ErrFoo
+func (ss *stubFailingSessionStorage) Get(sid string) (Session, error) {
+	return nil, errFoo
 }
 
 func (ss *stubFailingSessionStorage) Rip(sid string) error {
-	return ErrFoo
+	return errFoo
 }
 
 func (ss *stubFailingSessionStorage) Reap(checker AgeChecker) {
 }
 
 type mockSessionStorage struct {
-	Sessions map[string]ISession
-	SaveFunc func(sess ISession) error
-	GetFunc  func(sid string) (ISession, error)
+	Sessions map[string]Session
+	SaveFunc func(sess Session) error
+	GetFunc  func(sid string) (Session, error)
 	RipFunc  func(sid string) error
 	ReapFunc func(checker AgeChecker)
 }
 
-func (ss *mockSessionStorage) Save(sess ISession) error {
+func (ss *mockSessionStorage) Save(sess Session) error {
 	return ss.SaveFunc(sess)
 }
 
-func (ss *mockSessionStorage) Get(sid string) (ISession, error) {
+func (ss *mockSessionStorage) Get(sid string) (Session, error) {
 	return ss.GetFunc(sid)
 }
 
@@ -156,7 +156,7 @@ func (ss *mockSessionStorage) Reap(checker AgeChecker) {
 
 type stubAgeChecker int64
 
-func (m stubAgeChecker) ShouldReap(sess ISession) bool {
+func (m stubAgeChecker) ShouldReap(sess Session) bool {
 	diff := time.Now().UnixNano() - sess.CreationTime().UnixNano()
 	return diff > int64(m)
 }

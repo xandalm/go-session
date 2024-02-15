@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-type ISession interface {
+type Session interface {
 	Set(key string, value any) error
 	Get(key string) any
 	Delete(key string) error
@@ -18,21 +18,21 @@ type ISession interface {
 	CreationTime() time.Time
 }
 
-type IProvider interface {
-	SessionInit(sid string) (ISession, error)
-	SessionRead(sid string) (ISession, error)
+type Provider interface {
+	SessionInit(sid string) (Session, error)
+	SessionRead(sid string) (Session, error)
 	SessionDestroy(sid string) error
 	SessionGC(maxAge int64)
 }
 
 type Manager struct {
 	mu         sync.Mutex
-	provider   IProvider
+	provider   Provider
 	cookieName string
 	maxAge     int64
 }
 
-func NewManager(provider IProvider, cookieName string, maxAge int64) *Manager {
+func NewManager(provider Provider, cookieName string, maxAge int64) *Manager {
 	return &Manager{
 		provider:   provider,
 		cookieName: cookieName,
@@ -48,7 +48,7 @@ func (m *Manager) sessionID() string {
 	return base64.URLEncoding.EncodeToString(b)
 }
 
-func (m *Manager) StartSession(w http.ResponseWriter, r *http.Request) (session ISession) {
+func (m *Manager) StartSession(w http.ResponseWriter, r *http.Request) (session Session) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	cookie, err := r.Cookie(m.cookieName)

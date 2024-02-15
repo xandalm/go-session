@@ -8,7 +8,7 @@ import (
 )
 
 func TestSessionBuilder(t *testing.T) {
-	builder := &SessionBuilder{}
+	builder := &defaultSessionBuilder{}
 	storage := &stubSessionStorage{}
 	t.Run("build and return session", func(t *testing.T) {
 
@@ -17,7 +17,7 @@ func TestSessionBuilder(t *testing.T) {
 
 		assert.NotNil(t, sess)
 
-		resess, ok := sess.(*Session)
+		resess, ok := sess.(*DefaultSession)
 
 		if !ok {
 			t.Fatal("didn't get expected session")
@@ -33,7 +33,7 @@ func TestSessionID(t *testing.T) {
 	t.Run("returns session id", func(t *testing.T) {
 
 		sid := "1"
-		sess := newSession(sid, time.Now(), map[string]any{})
+		sess := newDefaultSession(sid, time.Now(), map[string]any{})
 
 		assert.Equal(t, sess.SessionID(), sid)
 	})
@@ -43,7 +43,7 @@ func TestCreationTime(t *testing.T) {
 	t.Run("returns session creation time", func(t *testing.T) {
 
 		ct := time.Now()
-		sess := newSession("1", ct, map[string]any{})
+		sess := newDefaultSession("1", ct, map[string]any{})
 
 		assert.Equal(t, sess.CreationTime(), ct)
 	})
@@ -60,7 +60,7 @@ func TestSet(t *testing.T) {
 		{"returns error for nil value", "B", nil, ErrNilValueNotAllowed},
 	}
 
-	sess := newSession("1", time.Now(), map[string]any{})
+	sess := newDefaultSession("1", time.Now(), map[string]any{})
 
 	for _, c := range cases {
 		t.Run(c.tname, func(t *testing.T) {
@@ -83,7 +83,7 @@ func TestGet(t *testing.T) {
 		key := "A"
 		value := "value"
 
-		sess := newSession("1", time.Now(), map[string]any{key: value})
+		sess := newDefaultSession("1", time.Now(), map[string]any{key: value})
 
 		got := sess.Get(key)
 
@@ -95,7 +95,7 @@ func TestGet(t *testing.T) {
 func TestDelete(t *testing.T) {
 	t.Run("remove a pair from session map", func(t *testing.T) {
 
-		sess := newSession("1", time.Now(), map[string]any{"key": "value"})
+		sess := newDefaultSession("1", time.Now(), map[string]any{"key": "value"})
 
 		err := sess.Delete("key")
 
