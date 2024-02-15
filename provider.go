@@ -1,27 +1,38 @@
 package session
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 type ISessionBuilder interface {
 	Build(sid string, onSessionUpdate func(ISession) error) ISession
+}
+
+type AgeChecker interface {
+	ShouldReap(ISession) bool
 }
 
 type SessionStorage interface {
 	Save(ISession) error
 	Get(sid string) (ISession, error)
 	Rip(sid string) error
-	Reap(maxAge int64)
+	Reap(AgeChecker)
 }
+
+type AgeCheckerAdapter func(int64) AgeChecker
 
 type Provider struct {
-	builder ISessionBuilder
-	storage SessionStorage
+	builder           ISessionBuilder
+	storage           SessionStorage
+	ageCheckerAdapter AgeCheckerAdapter
 }
 
-func NewProvider(builder ISessionBuilder, storage SessionStorage) *Provider {
+func NewProvider(builder ISessionBuilder, storage SessionStorage, adapter AgeCheckerAdapter) *Provider {
 	return &Provider{
 		builder,
 		storage,
+		adapter,
 	}
 }
 
@@ -77,5 +88,15 @@ func (p *Provider) SessionDestroy(sid string) error {
 }
 
 func (p *Provider) SessionGC(maxAge int64) {
-	p.storage.Reap(maxAge)
+	p.storage.Reap(p.ageCheckerAdapter(maxAge))
+}
+
+type SecondsBasedAgeChecker int64
+
+func (ma SecondsBasedAgeChecker) ShouldReap(sess ISession) bool {
+	if sess == nil {
+		panic("session: cannot check age from nil session")
+	}
+	diff := time.Now().Unix() - sess.CreationTime().Unix()
+	return diff >= int64(ma)
 }

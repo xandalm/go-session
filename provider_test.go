@@ -7,12 +7,16 @@ import (
 	"github.com/xandalm/go-session/testing/assert"
 )
 
+var dummyAdapter = func(maxAge int64) AgeChecker {
+	return nil
+}
+
 func TestSessionInit(t *testing.T) {
 
 	sessionBuilder := &stubSessionBuilder{}
 	sessionStorage := &stubSessionStorage{}
 
-	provider := NewProvider(sessionBuilder, sessionStorage)
+	provider := NewProvider(sessionBuilder, sessionStorage, dummyAdapter)
 
 	t.Run("init, store and returns session", func(t *testing.T) {
 
@@ -45,7 +49,7 @@ func TestSessionInit(t *testing.T) {
 				},
 			},
 		}
-		provider := NewProvider(sessionBuilder, sessionStorage)
+		provider := NewProvider(sessionBuilder, sessionStorage, dummyAdapter)
 
 		_, err := provider.SessionInit("17af454")
 
@@ -57,7 +61,7 @@ func TestSessionInit(t *testing.T) {
 			GetFunc:  func(sid string) (ISession, error) { return nil, nil },
 			SaveFunc: func(sess ISession) error { return ErrFoo },
 		}
-		provider := NewProvider(sessionBuilder, sessionStorage)
+		provider := NewProvider(sessionBuilder, sessionStorage, dummyAdapter)
 
 		_, err := provider.SessionInit("17af450")
 
@@ -76,7 +80,7 @@ func TestSessionRead(t *testing.T) {
 		},
 	}
 
-	provider := NewProvider(sessionBuilder, sessionStorage)
+	provider := NewProvider(sessionBuilder, sessionStorage, dummyAdapter)
 
 	t.Run("returns stored session", func(t *testing.T) {
 		sid := "17af454"
@@ -90,7 +94,7 @@ func TestSessionRead(t *testing.T) {
 		}
 	})
 	t.Run("returns error on failing session restoration", func(t *testing.T) {
-		provider := NewProvider(&stubSessionBuilder{}, &stubFailingSessionStorage{})
+		provider := NewProvider(&stubSessionBuilder{}, &stubFailingSessionStorage{}, dummyAdapter)
 
 		_, err := provider.SessionRead("17af454")
 
@@ -109,7 +113,7 @@ func TestSessionDestroy(t *testing.T) {
 		},
 	}
 
-	provider := NewProvider(sessionBuilder, sessionStorage)
+	provider := NewProvider(sessionBuilder, sessionStorage, dummyAdapter)
 
 	t.Run("destroys session", func(t *testing.T) {
 		sid := "17af454"
@@ -122,7 +126,7 @@ func TestSessionDestroy(t *testing.T) {
 		}
 	})
 	t.Run("returns error for destroy failing", func(t *testing.T) {
-		provider := NewProvider(&stubSessionBuilder{}, &stubFailingSessionStorage{})
+		provider := NewProvider(&stubSessionBuilder{}, &stubFailingSessionStorage{}, dummyAdapter)
 
 		err := provider.SessionDestroy("17af454")
 
@@ -132,28 +136,34 @@ func TestSessionDestroy(t *testing.T) {
 
 func TestSessionGC(t *testing.T) {
 
-	sess := &stubSession{
-		Id:        "17af454",
-		CreatedAt: time.Now(),
-	}
-
-	sessionBuilder := &stubSessionBuilder{}
-	sessionStorage := &stubSessionStorage{
-		Sessions: map[string]ISession{
-			"17af454": sess,
-		},
-	}
-
-	provider := NewProvider(sessionBuilder, sessionStorage)
-
 	t.Run("destroy sessions that arrives max age", func(t *testing.T) {
 
-		time.Sleep(1 * time.Second)
+		sid1 := "17af450"
+		sid2 := "17af454"
 
-		provider.SessionGC(1)
+		sessionBuilder := &stubSessionBuilder{}
+		sessionStorage := &stubSessionStorage{
+			Sessions: map[string]ISession{},
+		}
 
-		if _, ok := sessionStorage.Sessions[sess.Id]; ok {
-			t.Error("didn't destroy session")
+		provider := NewProvider(sessionBuilder, sessionStorage, func(maxAge int64) AgeChecker {
+			return stubAgeChecker(maxAge)
+		})
+
+		sessionStorage.Sessions[sid1] = newStubSession(sid1, time.Now(), nil)
+
+		time.Sleep(1 * time.Microsecond)
+
+		sessionStorage.Sessions[sid2] = newStubSession(sid2, time.Now(), nil)
+
+		provider.SessionGC(10)
+
+		if _, ok := sessionStorage.Sessions[sid1]; ok {
+			t.Fatal("didn't destroy session")
+		}
+
+		if len(sessionStorage.Sessions) != 1 {
+			t.Errorf("expected a session(sid: %s) in storage", sid2)
 		}
 	})
 }

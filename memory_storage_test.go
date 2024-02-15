@@ -9,10 +9,8 @@ import (
 
 func TestMemoryStorage_Save(t *testing.T) {
 	t.Run("save session into storage", func(t *testing.T) {
-		storage := &MemoryStorage{
-			sessions: map[string]ISession{},
-			list:     []ISession{},
-		}
+
+		storage := NewMemoryStorage(map[string]ISession{}, []ISession{})
 
 		sess := newStubSession("1", time.Now(), dummyFn)
 
@@ -33,12 +31,7 @@ func TestMemoryStorage_Get(t *testing.T) {
 
 		sid := "1"
 		sess := newStubSession(sid, time.Now(), dummyFn)
-		storage := &MemoryStorage{
-			sessions: map[string]ISession{
-				sid: sess,
-			},
-			list: []ISession{sess},
-		}
+		storage := NewMemoryStorage(map[string]ISession{sid: sess}, []ISession{sess})
 
 		got, err := storage.Get(sid)
 
@@ -60,12 +53,7 @@ func TestMemoryStorage_Rip(t *testing.T) {
 
 		sid := "1"
 		sess := newStubSession(sid, time.Now(), dummyFn)
-		storage := &MemoryStorage{
-			sessions: map[string]ISession{
-				sid: sess,
-			},
-			list: []ISession{sess},
-		}
+		storage := NewMemoryStorage(map[string]ISession{sid: sess}, []ISession{sess})
 
 		err := storage.Rip(sid)
 
@@ -79,11 +67,7 @@ func TestMemoryStorage_Rip(t *testing.T) {
 
 func TestMemoryStorage_Reap(t *testing.T) {
 	t.Run("remove expired sessions", func(t *testing.T) {
-
-		storage := &MemoryStorage{
-			sessions: map[string]ISession{},
-			list:     []ISession{},
-		}
+		storage := NewMemoryStorage(map[string]ISession{}, []ISession{})
 
 		sess1 := newStubSession("1", time.Now(), dummyFn)
 		storage.sessions[sess1.Id] = sess1
@@ -93,13 +77,13 @@ func TestMemoryStorage_Reap(t *testing.T) {
 		storage.sessions[sess2.Id] = sess2
 		storage.list = append(storage.list, sess2)
 
-		time.Sleep(1 * time.Second)
+		time.Sleep(time.Microsecond)
 
 		sess3 := newStubSession("3", time.Now(), dummyFn)
 		storage.sessions[sess3.Id] = sess3
 		storage.list = append(storage.list, sess3)
 
-		storage.Reap(1)
+		storage.Reap(stubAgeChecker(10))
 
 		if len(storage.sessions) > 1 {
 			t.Error("didn't remove expired sessions")

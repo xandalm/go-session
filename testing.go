@@ -101,10 +101,9 @@ func (ss *stubSessionStorage) Rip(sid string) error {
 	return nil
 }
 
-func (ss *stubSessionStorage) Reap(maxAge int64) {
+func (ss *stubSessionStorage) Reap(checker AgeChecker) {
 	for k, v := range ss.Sessions {
-		diff := time.Now().Unix() - v.(*stubSession).CreatedAt.Unix()
-		if diff >= maxAge {
+		if checker.ShouldReap(v) {
 			delete(ss.Sessions, k)
 		}
 	}
@@ -128,7 +127,7 @@ func (ss *stubFailingSessionStorage) Rip(sid string) error {
 	return ErrFoo
 }
 
-func (ss *stubFailingSessionStorage) Reap(maxAge int64) {
+func (ss *stubFailingSessionStorage) Reap(checker AgeChecker) {
 }
 
 type mockSessionStorage struct {
@@ -136,7 +135,7 @@ type mockSessionStorage struct {
 	SaveFunc func(sess ISession) error
 	GetFunc  func(sid string) (ISession, error)
 	RipFunc  func(sid string) error
-	ReapFunc func(maxAge int64)
+	ReapFunc func(checker AgeChecker)
 }
 
 func (ss *mockSessionStorage) Save(sess ISession) error {
@@ -151,6 +150,13 @@ func (ss *mockSessionStorage) Rip(sid string) error {
 	return ss.RipFunc(sid)
 }
 
-func (ss *mockSessionStorage) Reap(maxAge int64) {
-	ss.ReapFunc(maxAge)
+func (ss *mockSessionStorage) Reap(checker AgeChecker) {
+	ss.ReapFunc(checker)
+}
+
+type stubAgeChecker int64
+
+func (m stubAgeChecker) ShouldReap(sess ISession) bool {
+	diff := time.Now().UnixNano() - sess.CreationTime().UnixNano()
+	return diff > int64(m)
 }

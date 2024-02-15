@@ -2,7 +2,6 @@ package session
 
 import (
 	"sync"
-	"time"
 )
 
 type MemoryStorage struct {
@@ -49,13 +48,13 @@ func (s *MemoryStorage) indexOf(id string) int64 {
 	return -1
 }
 
-func (s *MemoryStorage) Reap(maxAge int64) {
+func (s *MemoryStorage) Reap(checker AgeChecker) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var marker int
 	for i := 0; i < len(s.list); i++ {
 		sess := s.list[i]
-		if time.Now().Unix()-sess.CreationTime().Unix() >= maxAge {
+		if checker.ShouldReap(sess) {
 			marker = i
 			continue
 		}
