@@ -30,8 +30,7 @@ func NotEmpty[T any](t testing.TB, v T) {
 		reflect.Map,
 		reflect.Slice,
 		reflect.String:
-		l := value.Len()
-		if l != 0 {
+		if value.Len() != 0 {
 			return
 		}
 	default:
