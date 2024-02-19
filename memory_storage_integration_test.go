@@ -19,6 +19,7 @@ type mockServer struct {
 }
 
 func newServer(manager *session.Manager) *mockServer {
+	manager.GC()
 	return &mockServer{
 		manager,
 		make([]string, 0),
@@ -73,14 +74,77 @@ func (s *mockServer) handleGetOnlinePlayers(w http.ResponseWriter, r *http.Reque
 	fmt.Fprint(w, strings.Join(s.players, ","))
 }
 
+type stubCookieManager struct {
+	cookies map[string]*struct {
+		v              *http.Cookie
+		creationTime   time.Time
+		lastAccessTime time.Time
+	}
+}
+
+func newStubCookieManager() *stubCookieManager {
+	return &stubCookieManager{
+		make(map[string]*struct {
+			v              *http.Cookie
+			creationTime   time.Time
+			lastAccessTime time.Time
+		}),
+	}
+}
+
+func (m *stubCookieManager) expires(cookie *struct {
+	v              *http.Cookie
+	creationTime   time.Time
+	lastAccessTime time.Time
+}) bool {
+	maxAge := cookie.v.MaxAge
+	expires := cookie.v.Expires
+	if maxAge < 0 {
+		return true
+	}
+	if !expires.IsZero() {
+		return expires.Before(time.Now())
+	}
+	return time.Now().Unix()-cookie.creationTime.Unix() > int64(maxAge)
+}
+
+func (m *stubCookieManager) SetCookie(cookie *http.Cookie) {
+	if c, ok := m.cookies[cookie.Name]; ok {
+		c.v = cookie
+		c.lastAccessTime = time.Now()
+		return
+	}
+	m.cookies[cookie.Name] = &struct {
+		v              *http.Cookie
+		creationTime   time.Time
+		lastAccessTime time.Time
+	}{cookie, time.Now(), time.Now()}
+}
+
+func (m *stubCookieManager) WriteCookies(r *http.Request) {
+	keep := make(map[string]*struct {
+		v              *http.Cookie
+		creationTime   time.Time
+		lastAccessTime time.Time
+	})
+	for name, c := range m.cookies {
+		if m.expires(c) {
+			continue
+		}
+		keep[name] = c
+		r.AddCookie(c.v)
+	}
+	m.cookies = keep
+}
+
 func TestSessionsWithMemoryStorage(t *testing.T) {
 	storage := session.NewMemoryStorage()
 	provider := session.NewDefaultProvider(session.DefaultSessionBuilder, storage, nil)
-	manager := session.NewManager(provider, "SESSION_ID", 60)
+	manager := session.NewManager(provider, "SESSION_ID", 1)
 
 	server := newServer(manager)
 
-	var cookie *http.Cookie = nil
+	cookieManager := newStubCookieManager()
 
 	parseCookie := func(cookie map[string]string) *http.Cookie {
 		maxAge, _ := strconv.Atoi(cookie["Max-Age"])
@@ -112,7 +176,8 @@ func TestSessionsWithMemoryStorage(t *testing.T) {
 		server.ServerHTTP(response, request)
 
 		assertHTTPStatus(t, response, http.StatusOK)
-		cookie = parseCookie(getCookieFromResponse(response))
+		cookie := parseCookie(getCookieFromResponse(response))
+		cookieManager.SetCookie(cookie)
 	})
 
 	form := url.Values{}
@@ -124,7 +189,9 @@ func TestSessionsWithMemoryStorage(t *testing.T) {
 	t.Run("get players", func(t *testing.T) {
 
 		request, _ := http.NewRequest(http.MethodGet, "http://foo.com/players", nil)
-		request.AddCookie(cookie)
+
+		cookieManager.WriteCookies(request)
+
 		response := httptest.NewRecorder()
 
 		server.ServerHTTP(response, request)
@@ -136,6 +203,20 @@ func TestSessionsWithMemoryStorage(t *testing.T) {
 		if got != want {
 			t.Errorf("got players %s, but want %s", got, want)
 		}
+	})
+
+	t.Run("logoff player after session expires", func(t *testing.T) {
+		time.Sleep(2 * time.Second)
+
+		request, _ := http.NewRequest(http.MethodGet, "http://foo.com/players", nil)
+
+		cookieManager.WriteCookies(request)
+
+		response := httptest.NewRecorder()
+
+		server.ServerHTTP(response, request)
+
+		assertHTTPStatus(t, response, http.StatusUnauthorized)
 	})
 }
 

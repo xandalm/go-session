@@ -51,7 +51,7 @@ func (s *MemoryStorage) indexOf(id string) int64 {
 func (s *MemoryStorage) Reap(checker AgeChecker) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var marker int
+	var marker int = -1
 	for i := 0; i < len(s.list); i++ {
 		sess := s.list[i]
 		if checker.ShouldReap(sess) {
@@ -59,6 +59,9 @@ func (s *MemoryStorage) Reap(checker AgeChecker) {
 			continue
 		}
 		break
+	}
+	if marker == -1 {
+		return
 	}
 	for i := 0; i <= marker; i++ {
 		delete(s.sessions, s.list[i].SessionID())
