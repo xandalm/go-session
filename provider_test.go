@@ -93,6 +93,17 @@ func TestSessionRead(t *testing.T) {
 			t.Errorf("didn't get expected session, got %s but want %s", session.SessionID(), sid)
 		}
 	})
+	t.Run("start new session if has no session to read", func(t *testing.T) {
+		sid := "17af450"
+		session, err := provider.SessionRead(sid)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, session)
+
+		if session.SessionID() != sid {
+			t.Errorf("didn't get expected session, got %s but want %s", session.SessionID(), sid)
+		}
+	})
 	t.Run("returns error on failing session restoration", func(t *testing.T) {
 		sessionBuilder := &stubSessionBuilder{}
 		sessionStorage := &stubFailingSessionStorage{}
@@ -151,23 +162,23 @@ func TestSessionGC(t *testing.T) {
 		}
 
 		provider := &DefaultProvider{sessionBuilder, sessionStorage, func(maxAge int64) AgeChecker {
-			return stubAgeChecker(maxAge)
+			return stubMilliAgeChecker(maxAge)
 		}}
 
 		sessionStorage.Sessions[sid1] = newStubSession(sid1, time.Now(), nil)
 
-		time.Sleep(1 * time.Microsecond)
+		time.Sleep(2 * time.Millisecond)
 
 		sessionStorage.Sessions[sid2] = newStubSession(sid2, time.Now(), nil)
 
-		provider.SessionGC(10)
+		provider.SessionGC(1)
 
 		if _, ok := sessionStorage.Sessions[sid1]; ok {
 			t.Fatal("didn't destroy session")
 		}
 
 		if len(sessionStorage.Sessions) != 1 {
-			t.Errorf("expected a session(sid: %s) in storage", sid2)
+			t.Errorf("expected the session with id=%s in storage", sid2)
 		}
 	})
 }

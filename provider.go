@@ -93,6 +93,10 @@ func (p *DefaultProvider) SessionRead(sid string) (Session, error) {
 	if err != nil {
 		return nil, ErrUnableToRestoreSession
 	}
+	if sess == nil {
+		sess, err = p.SessionInit(sid)
+		return sess, err
+	}
 	return sess, nil
 }
 

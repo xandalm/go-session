@@ -95,7 +95,7 @@ func TestMemoryStorage_Reap(t *testing.T) {
 		storage.sessions[sess3.Id] = sess3
 		storage.list = append(storage.list, sess3)
 
-		storage.Reap(stubAgeChecker(10))
+		storage.Reap(stubNanoAgeChecker(10))
 
 		if len(storage.sessions) > 1 {
 			t.Error("didn't remove expired sessions")

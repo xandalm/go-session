@@ -2,6 +2,7 @@ package session
 
 import (
 	"errors"
+	"sync"
 	"time"
 )
 
@@ -43,10 +44,13 @@ func (s *stubSession) CreationTime() time.Time {
 }
 
 type stubProvider struct {
+	mu       sync.Mutex
 	Sessions map[string]Session
 }
 
 func (p *stubProvider) SessionInit(sid string) (Session, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if p.Sessions == nil {
 		p.Sessions = make(map[string]Session)
 	}
@@ -63,6 +67,8 @@ func (p *stubProvider) SessionRead(sid string) (Session, error) {
 }
 
 func (p *stubProvider) SessionDestroy(sid string) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	delete(p.Sessions, sid)
 	return nil
 }
@@ -80,10 +86,13 @@ func (sb *stubSessionBuilder) Build(sid string, onSessionUpdate func(Session) er
 }
 
 type stubSessionStorage struct {
+	mu       sync.Mutex
 	Sessions map[string]Session
 }
 
 func (ss *stubSessionStorage) Save(sess Session) error {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
 	if ss.Sessions == nil {
 		ss.Sessions = make(map[string]Session)
 	}
@@ -97,11 +106,15 @@ func (ss *stubSessionStorage) Get(sid string) (Session, error) {
 }
 
 func (ss *stubSessionStorage) Rip(sid string) error {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
 	delete(ss.Sessions, sid)
 	return nil
 }
 
 func (ss *stubSessionStorage) Reap(checker AgeChecker) {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
 	for k, v := range ss.Sessions {
 		if checker.ShouldReap(v) {
 			delete(ss.Sessions, k)
@@ -154,9 +167,16 @@ func (ss *mockSessionStorage) Reap(checker AgeChecker) {
 	ss.ReapFunc(checker)
 }
 
-type stubAgeChecker int64
+type stubNanoAgeChecker int64
 
-func (m stubAgeChecker) ShouldReap(sess Session) bool {
+func (m stubNanoAgeChecker) ShouldReap(sess Session) bool {
 	diff := time.Now().UnixNano() - sess.CreationTime().UnixNano()
+	return diff > int64(m)
+}
+
+type stubMilliAgeChecker int64
+
+func (m stubMilliAgeChecker) ShouldReap(sess Session) bool {
+	diff := time.Now().UnixMilli() - sess.CreationTime().UnixMilli()
 	return diff > int64(m)
 }
