@@ -2,6 +2,7 @@ package session
 
 import (
 	"errors"
+	"maps"
 	"time"
 )
 
@@ -34,6 +35,10 @@ func (s *defaultSession) Get(key string) any {
 func (s *defaultSession) Delete(key string) error {
 	delete(s.v, key)
 	return nil
+}
+
+func (s *defaultSession) Values() SessionValues {
+	return maps.Clone(s.v)
 }
 
 func (s *defaultSession) SessionID() string {

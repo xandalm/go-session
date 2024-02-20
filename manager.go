@@ -14,6 +14,7 @@ type Session interface {
 	Set(key string, value any) error
 	Get(key string) any
 	Delete(key string) error
+	Values() SessionValues
 	SessionID() string
 	CreationTime() time.Time
 }

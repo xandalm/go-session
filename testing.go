@@ -2,6 +2,7 @@ package session
 
 import (
 	"errors"
+	"maps"
 	"sync"
 	"time"
 )
@@ -9,6 +10,7 @@ import (
 type stubSession struct {
 	Id        string
 	CreatedAt time.Time
+	V         SessionValues
 	OnUpdate  func(Session) error
 }
 
@@ -16,23 +18,29 @@ func newStubSession(id string, t time.Time, onUpdate func(Session) error) *stubS
 	return &stubSession{
 		Id:        id,
 		CreatedAt: t,
+		V:         SessionValues{},
 		OnUpdate:  onUpdate,
 	}
 }
 
 func (s *stubSession) Set(key string, value any) error {
+	s.V[key] = value
 	s.OnUpdate(s)
 	return nil
 }
 
 func (s *stubSession) Get(key string) any {
+	return s.V[key]
+}
+
+func (s *stubSession) Delete(key string) error {
+	delete(s.V, key)
 	s.OnUpdate(s)
 	return nil
 }
 
-func (s *stubSession) Delete(key string) error {
-	s.OnUpdate(s)
-	return nil
+func (s *stubSession) Values() SessionValues {
+	return maps.Clone(s.V)
 }
 
 func (s *stubSession) SessionID() string {
