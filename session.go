@@ -12,11 +12,11 @@ var (
 type defaultSession struct {
 	id string
 	ct time.Time
-	v  map[string]any
+	v  SessionValues
 }
 
 func newDefaultSession(id string) *defaultSession {
-	return &defaultSession{id, time.Now(), make(map[string]any)}
+	return &defaultSession{id, time.Now(), make(SessionValues)}
 }
 
 func (s *defaultSession) Set(key string, value any) error {
@@ -50,21 +50,12 @@ func (sb *defaultSessionBuilder) Build(sid string, onSessionUpdate func(sess Ses
 	return newDefaultSession(sid)
 }
 
-func (sb *defaultSessionBuilder) Expose(sess Session) map[string]any {
-	res := make(map[string]any)
-
-	_sess, ok := sess.(*defaultSession)
-	if !ok {
-		panic("session: cannot expose session because incompatibility")
-	}
-
-	res["_session_id"] = _sess.SessionID()
-	res["_creation_time"] = _sess.CreationTime()
-	for key, value := range _sess.v {
-		res[key] = value
-	}
-
-	return res
+func (sb *defaultSessionBuilder) Restore(sid string, creationTime time.Time, values SessionValues, onSessionUpdate func(sess Session) error) (Session, error) {
+	return &defaultSession{
+		sid,
+		creationTime,
+		values,
+	}, nil
 }
 
 var DefaultSessionBuilder SessionBuilder = &defaultSessionBuilder{}

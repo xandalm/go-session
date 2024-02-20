@@ -80,16 +80,18 @@ type stubSessionBuilder struct {
 
 func (sb *stubSessionBuilder) Build(sid string, onSessionUpdate func(Session) error) Session {
 	return &stubSession{
-		Id:       sid,
-		OnUpdate: onSessionUpdate,
+		Id:        sid,
+		CreatedAt: time.Now(),
+		OnUpdate:  onSessionUpdate,
 	}
 }
 
-func (sb *stubSessionBuilder) Expose(sess Session) map[string]any {
-	return map[string]any{
-		"sessionid":    sess.SessionID(),
-		"creationtime": sess.CreationTime(),
-	}
+func (sb *stubSessionBuilder) Restore(sid string, creationTime time.Time, values SessionValues, onSessionUpdate func(Session) error) (Session, error) {
+	return &stubSession{
+		Id:        sid,
+		CreatedAt: creationTime,
+		OnUpdate:  onSessionUpdate,
+	}, nil
 }
 
 type stubSessionStorage struct {
@@ -127,6 +129,47 @@ func (ss *stubSessionStorage) Reap(checker AgeChecker) {
 			delete(ss.Sessions, k)
 		}
 	}
+}
+
+type spySessionBuilder struct {
+	callsToBuild   int
+	callsToRestore int
+}
+
+func (sb *spySessionBuilder) Build(sid string, onSessionUpdate func(Session) error) Session {
+	sb.callsToBuild++
+	return nil
+}
+
+func (sb *spySessionBuilder) Restore(sid string, creationTime time.Time, values SessionValues, onSessionUpdate func(Session) error) (Session, error) {
+	sb.callsToRestore++
+	return nil, nil
+}
+
+type spySessionStorage struct {
+	callsToSave int
+	callsToGet  int
+	callsToRip  int
+	callsToReap int
+}
+
+func (ss *spySessionStorage) Save(sess Session) error {
+	ss.callsToSave++
+	return nil
+}
+
+func (ss *spySessionStorage) Get(sid string) (Session, error) {
+	ss.callsToGet++
+	return nil, nil
+}
+
+func (ss *spySessionStorage) Rip(sid string) error {
+	ss.callsToRip++
+	return nil
+}
+
+func (ss *spySessionStorage) Reap(checker AgeChecker) {
+	ss.callsToReap++
 }
 
 type stubFailingSessionStorage struct {

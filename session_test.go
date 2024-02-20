@@ -28,19 +28,20 @@ func TestSessionBuilder(t *testing.T) {
 		assert.NotEmpty(t, resess.ct)
 		assert.NotNil(t, resess.v)
 	})
-	t.Run("expose session", func(t *testing.T) {
+	t.Run("restore session", func(t *testing.T) {
 		sid := "1"
-		creationtime := time.Now()
-		sess := &defaultSession{sid, creationtime, map[string]any{}}
-
-		got := builder.Expose(sess)
-		want := map[string]any{
-			"_session_id":    sid,
-			"_creation_time": creationtime,
+		creationTime := time.Now()
+		values := SessionValues{
+			"name": "John",
 		}
 
-		if !reflect.DeepEqual(got, want) {
-			t.Errorf("got %+v, but want %+v", got, want)
+		got, err := builder.Restore(sid, creationTime, values, nil)
+
+		assert.NoError(t, err)
+
+		sess := got.(*defaultSession)
+		if sess.id != sid || sess.ct != creationTime || !reflect.DeepEqual(sess.v, values) {
+			t.Errorf("didn't get expected session")
 		}
 	})
 }

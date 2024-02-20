@@ -5,9 +5,11 @@ import (
 	"time"
 )
 
+type SessionValues map[string]any
+
 type SessionBuilder interface {
 	Build(sid string, onSessionUpdate func(Session) error) Session
-	Expose(sess Session) map[string]any
+	Restore(sidi string, creationTime time.Time, values SessionValues, onSessionUpdate func(Session) error) (Session, error)
 }
 
 type AgeChecker interface {

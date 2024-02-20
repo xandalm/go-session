@@ -12,12 +12,27 @@ var dummyAdapter = func(maxAge int64) AgeChecker {
 }
 
 func TestSessionInit(t *testing.T) {
+	t.Run("call build and save supporters", func(t *testing.T) {
+		sessionBuilder := &spySessionBuilder{}
+		sessionStorage := &spySessionStorage{}
+
+		provider := &DefaultProvider{sessionBuilder, sessionStorage, dummyAdapter}
+
+		_, err := provider.SessionInit("1")
+		assert.NoError(t, err)
+
+		if sessionBuilder.callsToBuild == 0 {
+			t.Fatal("didn't call builder to build")
+		}
+		if sessionStorage.callsToSave == 0 {
+			t.Error("didn't call storage to save")
+		}
+	})
 
 	sessionBuilder := &stubSessionBuilder{}
 	sessionStorage := &stubSessionStorage{}
 
 	provider := &DefaultProvider{sessionBuilder, sessionStorage, dummyAdapter}
-
 	t.Run("init, store and returns session", func(t *testing.T) {
 
 		sid := "17af454"
