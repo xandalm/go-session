@@ -7,6 +7,7 @@ import (
 
 type SessionBuilder interface {
 	Build(sid string, onSessionUpdate func(Session) error) Session
+	Expose(sess Session) map[string]any
 }
 
 type AgeChecker interface {

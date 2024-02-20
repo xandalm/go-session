@@ -85,6 +85,13 @@ func (sb *stubSessionBuilder) Build(sid string, onSessionUpdate func(Session) er
 	}
 }
 
+func (sb *stubSessionBuilder) Expose(sess Session) map[string]any {
+	return map[string]any{
+		"sessionid":    sess.SessionID(),
+		"creationtime": sess.CreationTime(),
+	}
+}
+
 type stubSessionStorage struct {
 	mu       sync.Mutex
 	Sessions map[string]Session

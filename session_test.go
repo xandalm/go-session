@@ -1,6 +1,7 @@
 package session
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -17,7 +18,7 @@ func TestSessionBuilder(t *testing.T) {
 
 		assert.NotNil(t, sess)
 
-		resess, ok := sess.(*DefaultSession)
+		resess, ok := sess.(*defaultSession)
 
 		if !ok {
 			t.Fatal("didn't get expected session")
@@ -27,13 +28,28 @@ func TestSessionBuilder(t *testing.T) {
 		assert.NotEmpty(t, resess.ct)
 		assert.NotNil(t, resess.v)
 	})
+	t.Run("expose session", func(t *testing.T) {
+		sid := "1"
+		creationtime := time.Now()
+		sess := &defaultSession{sid, creationtime, map[string]any{}}
+
+		got := builder.Expose(sess)
+		want := map[string]any{
+			"_session_id":    sid,
+			"_creation_time": creationtime,
+		}
+
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("got %+v, but want %+v", got, want)
+		}
+	})
 }
 
 func TestSessionID(t *testing.T) {
 	t.Run("returns session id", func(t *testing.T) {
 
 		sid := "1"
-		sess := newDefaultSession(sid, time.Now(), map[string]any{})
+		sess := &defaultSession{sid, time.Now(), map[string]any{}}
 
 		assert.Equal(t, sess.SessionID(), sid)
 	})
@@ -43,7 +59,7 @@ func TestCreationTime(t *testing.T) {
 	t.Run("returns session creation time", func(t *testing.T) {
 
 		ct := time.Now()
-		sess := newDefaultSession("1", ct, map[string]any{})
+		sess := &defaultSession{"1", ct, map[string]any{}}
 
 		assert.Equal(t, sess.CreationTime(), ct)
 	})
@@ -60,7 +76,7 @@ func TestSet(t *testing.T) {
 		{"returns error for nil value", "B", nil, ErrNilValueNotAllowed},
 	}
 
-	sess := newDefaultSession("1", time.Now(), map[string]any{})
+	sess := &defaultSession{"1", time.Now(), map[string]any{}}
 
 	for _, c := range cases {
 		t.Run(c.tname, func(t *testing.T) {
@@ -83,7 +99,7 @@ func TestGet(t *testing.T) {
 		key := "A"
 		value := "value"
 
-		sess := newDefaultSession("1", time.Now(), map[string]any{key: value})
+		sess := &defaultSession{"1", time.Now(), map[string]any{key: value}}
 
 		got := sess.Get(key)
 
@@ -95,7 +111,7 @@ func TestGet(t *testing.T) {
 func TestDelete(t *testing.T) {
 	t.Run("remove a pair from session map", func(t *testing.T) {
 
-		sess := newDefaultSession("1", time.Now(), map[string]any{"key": "value"})
+		sess := &defaultSession{"1", time.Now(), map[string]any{"key": "value"}}
 
 		err := sess.Delete("key")
 
