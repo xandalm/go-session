@@ -9,11 +9,11 @@ type SessionValues map[string]any
 
 type SessionBuilder interface {
 	Build(sid string, onSessionUpdate func(Session) error) Session
-	Restore(sidi string, creationTime time.Time, values SessionValues, onSessionUpdate func(Session) error) (Session, error)
+	Restore(sid string, creationTime time.Time, values SessionValues, onSessionUpdate func(Session) error) (Session, error)
 }
 
 type AgeChecker interface {
-	ShouldReap(Session) bool
+	ShouldReap(time.Time) bool
 }
 
 type Storage interface {
@@ -27,11 +27,8 @@ type AgeCheckerAdapter func(int64) AgeChecker
 
 type secondsAgeChecker int64
 
-func (ma secondsAgeChecker) ShouldReap(sess Session) bool {
-	if sess == nil {
-		panic("session: cannot check age from nil session")
-	}
-	diff := time.Now().Unix() - sess.CreationTime().Unix()
+func (ma secondsAgeChecker) ShouldReap(t time.Time) bool {
+	diff := time.Now().Unix() - t.Unix()
 	return diff >= int64(ma)
 }
 

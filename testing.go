@@ -98,6 +98,7 @@ func (sb *stubSessionBuilder) Restore(sid string, creationTime time.Time, values
 	return &stubSession{
 		Id:        sid,
 		CreatedAt: creationTime,
+		V:         values,
 		OnUpdate:  onSessionUpdate,
 	}, nil
 }
@@ -133,7 +134,7 @@ func (ss *stubSessionStorage) Reap(checker AgeChecker) {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 	for k, v := range ss.Sessions {
-		if checker.ShouldReap(v) {
+		if checker.ShouldReap(v.CreationTime()) {
 			delete(ss.Sessions, k)
 		}
 	}
@@ -155,6 +156,7 @@ func (sb *spySessionBuilder) Restore(sid string, creationTime time.Time, values 
 }
 
 type spySessionStorage struct {
+	builder     SessionBuilder
 	callsToSave int
 	callsToGet  int
 	callsToRip  int
@@ -168,6 +170,7 @@ func (ss *spySessionStorage) Save(sess Session) error {
 
 func (ss *spySessionStorage) Get(sid string) (Session, error) {
 	ss.callsToGet++
+	ss.builder.Restore("", time.Now(), nil, nil)
 	return nil, nil
 }
 
@@ -227,14 +230,14 @@ func (ss *mockSessionStorage) Reap(checker AgeChecker) {
 
 type stubNanoAgeChecker int64
 
-func (m stubNanoAgeChecker) ShouldReap(sess Session) bool {
-	diff := time.Now().UnixNano() - sess.CreationTime().UnixNano()
+func (m stubNanoAgeChecker) ShouldReap(t time.Time) bool {
+	diff := time.Now().UnixNano() - t.UnixNano()
 	return diff > int64(m)
 }
 
 type stubMilliAgeChecker int64
 
-func (m stubMilliAgeChecker) ShouldReap(sess Session) bool {
-	diff := time.Now().UnixMilli() - sess.CreationTime().UnixMilli()
+func (m stubMilliAgeChecker) ShouldReap(t time.Time) bool {
+	diff := time.Now().UnixMilli() - t.UnixMilli()
 	return diff > int64(m)
 }
