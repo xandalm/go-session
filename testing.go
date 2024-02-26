@@ -86,11 +86,11 @@ func (p *stubProvider) SessionGC(maxLifeTime int64) {}
 type stubSessionBuilder struct {
 }
 
-func (sb *stubSessionBuilder) Build(sid string, onSessionUpdate func(Session) error) Session {
+func (sb *stubSessionBuilder) Build(sid string, storage Storage) Session {
 	return &stubSession{
 		Id:        sid,
 		CreatedAt: time.Now(),
-		OnUpdate:  onSessionUpdate,
+		OnUpdate:  storage.Save,
 	}
 }
 
@@ -145,7 +145,7 @@ type spySessionBuilder struct {
 	callsToRestore int
 }
 
-func (sb *spySessionBuilder) Build(sid string, onSessionUpdate func(Session) error) Session {
+func (sb *spySessionBuilder) Build(sid string, storage Storage) Session {
 	sb.callsToBuild++
 	return nil
 }

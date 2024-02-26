@@ -14,7 +14,7 @@ func TestSessionBuilder(t *testing.T) {
 	t.Run("build and return session", func(t *testing.T) {
 
 		sid := "1"
-		sess := builder.Build(sid, storage.Save)
+		sess := builder.Build(sid, storage)
 
 		assert.NotNil(t, sess)
 
@@ -50,7 +50,7 @@ func TestSessionID(t *testing.T) {
 	t.Run("returns session id", func(t *testing.T) {
 
 		sid := "1"
-		sess := &defaultSession{sid, time.Now(), map[string]any{}}
+		sess := &defaultSession{sid, time.Now(), map[string]any{}, nil}
 
 		assert.Equal(t, sess.SessionID(), sid)
 	})
@@ -60,7 +60,7 @@ func TestCreationTime(t *testing.T) {
 	t.Run("returns session creation time", func(t *testing.T) {
 
 		ct := time.Now()
-		sess := &defaultSession{"1", ct, map[string]any{}}
+		sess := &defaultSession{"1", ct, map[string]any{}, nil}
 
 		assert.Equal(t, sess.CreationTime(), ct)
 	})
@@ -77,7 +77,8 @@ func TestSet(t *testing.T) {
 		{"returns error for nil value", "B", nil, ErrNilValueNotAllowed},
 	}
 
-	sess := &defaultSession{"1", time.Now(), map[string]any{}}
+	storage := &stubSessionStorage{}
+	sess := newDefaultSession("1", storage)
 
 	for _, c := range cases {
 		t.Run(c.tname, func(t *testing.T) {
@@ -93,6 +94,19 @@ func TestSet(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("call save from storage interface", func(t *testing.T) {
+		storage := &spySessionStorage{}
+		sess := &defaultSession{"1", time.Now(), SessionValues{}, storage.Save}
+
+		err := sess.Set("key", "value")
+
+		assert.NoError(t, err)
+
+		if storage.callsToSave == 0 {
+			t.Error("didn't call to sasve from storage")
+		}
+	})
 }
 
 func TestGet(t *testing.T) {
@@ -100,7 +114,8 @@ func TestGet(t *testing.T) {
 		key := "A"
 		value := "value"
 
-		sess := &defaultSession{"1", time.Now(), map[string]any{key: value}}
+		storage := &stubSessionStorage{}
+		sess := &defaultSession{"1", time.Now(), map[string]any{key: value}, storage.Save}
 
 		got := sess.Get(key)
 
@@ -112,7 +127,8 @@ func TestGet(t *testing.T) {
 func TestDelete(t *testing.T) {
 	t.Run("remove a pair from session map", func(t *testing.T) {
 
-		sess := &defaultSession{"1", time.Now(), map[string]any{"key": "value"}}
+		storage := &stubSessionStorage{}
+		sess := &defaultSession{"1", time.Now(), map[string]any{"key": "value"}, storage.Save}
 
 		err := sess.Delete("key")
 

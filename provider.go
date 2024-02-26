@@ -8,7 +8,7 @@ import (
 type SessionValues map[string]any
 
 type SessionBuilder interface {
-	Build(sid string, onSessionUpdate func(Session) error) Session
+	Build(sid string, storage Storage) Session
 	Restore(sid string, creationTime time.Time, values SessionValues, onSessionUpdate func(Session) error) (Session, error)
 }
 
@@ -73,7 +73,7 @@ func (p *DefaultProvider) SessionInit(sid string) (Session, error) {
 	if !ok {
 		return nil, ErrDuplicateSessionId
 	}
-	sess := p.builder.Build(sid, p.storage.Save)
+	sess := p.builder.Build(sid, p.storage)
 	if err := p.storage.Save(sess); err != nil {
 		return nil, ErrUnableToSaveSession
 	}

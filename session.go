@@ -10,14 +10,17 @@ var (
 	ErrNilValueNotAllowed error = errors.New("session: stores nil values into session is not allowed")
 )
 
+type SessionStorageUpdater func(Session) error
+
 type defaultSession struct {
 	id string
 	ct time.Time
 	v  SessionValues
+	fn SessionStorageUpdater
 }
 
-func newDefaultSession(id string) *defaultSession {
-	return &defaultSession{id, time.Now(), make(SessionValues)}
+func newDefaultSession(id string, storage Storage) *defaultSession {
+	return &defaultSession{id, time.Now(), make(SessionValues), storage.Save}
 }
 
 func (s *defaultSession) Set(key string, value any) error {
@@ -25,6 +28,7 @@ func (s *defaultSession) Set(key string, value any) error {
 		return ErrNilValueNotAllowed
 	}
 	s.v[key] = value
+	s.fn(s)
 	return nil
 }
 
@@ -51,8 +55,8 @@ func (s *defaultSession) CreationTime() time.Time {
 
 type defaultSessionBuilder struct{}
 
-func (sb *defaultSessionBuilder) Build(sid string, onSessionUpdate func(sess Session) error) Session {
-	return newDefaultSession(sid)
+func (sb *defaultSessionBuilder) Build(sid string, storage Storage) Session {
+	return newDefaultSession(sid, storage)
 }
 
 func (sb *defaultSessionBuilder) Restore(sid string, creationTime time.Time, values SessionValues, onSessionUpdate func(sess Session) error) (Session, error) {
@@ -60,6 +64,7 @@ func (sb *defaultSessionBuilder) Restore(sid string, creationTime time.Time, val
 		sid,
 		creationTime,
 		values,
+		nil,
 	}, nil
 }
 
