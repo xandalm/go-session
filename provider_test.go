@@ -12,34 +12,29 @@ var dummyAdapter = func(maxAge int64) AgeChecker {
 }
 
 func TestSessionInit(t *testing.T) {
-	t.Run("call build and save from support interfaces", func(t *testing.T) {
-		sessionBuilder := &spySessionBuilder{}
-		sessionStorage := &spySessionStorage{builder: sessionBuilder}
+	t.Run("tell storage to create session", func(t *testing.T) {
+		sessionStorage := &spySessionStorage{}
 
-		provider := &DefaultProvider{sessionBuilder, sessionStorage, dummyAdapter}
+		provider := &DefaultProvider{sessionStorage, dummyAdapter}
 
 		_, err := provider.SessionInit("1")
 		assert.NoError(t, err)
 
-		if sessionBuilder.callsToBuild == 0 {
-			t.Fatal("didn't call builder to build")
-		}
-		if sessionStorage.callsToSave == 0 {
-			t.Error("didn't call storage to save")
+		if sessionStorage.callsToGetSession == 0 {
+			t.Error("didn't tell storage")
 		}
 	})
 
-	sessionBuilder := &stubSessionBuilder{}
-	sessionStorage := &stubSessionStorage{}
+	sessionStorage := newStubSessionStorage()
 
-	provider := &DefaultProvider{sessionBuilder, sessionStorage, dummyAdapter}
-	t.Run("init, store and returns session", func(t *testing.T) {
+	provider := &DefaultProvider{sessionStorage, dummyAdapter}
+	t.Run("init the session", func(t *testing.T) {
 
 		sid := "17af454"
-		session, err := provider.SessionInit(sid)
+		sess, err := provider.SessionInit(sid)
 
 		assert.NoError(t, err)
-		assert.NotNil(t, session)
+		assert.NotNil(t, sess)
 
 		if _, ok := sessionStorage.Sessions[sid]; !ok {
 			t.Error("didn't stores the session")
@@ -64,19 +59,19 @@ func TestSessionInit(t *testing.T) {
 				},
 			},
 		}
-		provider := &DefaultProvider{sessionBuilder, sessionStorage, dummyAdapter}
+		provider := &DefaultProvider{sessionStorage, dummyAdapter}
 
 		_, err := provider.SessionInit("17af454")
 
 		assert.Error(t, err, ErrUnableToEnsureNonDuplicity)
 	})
-	t.Run("returns error for storage save failure", func(t *testing.T) {
+	t.Run("returns error for storage create failure", func(t *testing.T) {
 		sessionStorage := &mockSessionStorage{
-			Sessions: map[string]Session{},
-			GetFunc:  func(sid string) (Session, error) { return nil, nil },
-			SaveFunc: func(sess Session) error { return errFoo },
+			Sessions:          map[string]Session{},
+			CreateSessionFunc: func(sid string) (Session, error) { return nil, errFoo },
+			GetSessionFunc:    func(sid string) (Session, error) { return nil, nil },
 		}
-		provider := &DefaultProvider{sessionBuilder, sessionStorage, dummyAdapter}
+		provider := &DefaultProvider{sessionStorage, dummyAdapter}
 
 		_, err := provider.SessionInit("17af450")
 
@@ -86,35 +81,30 @@ func TestSessionInit(t *testing.T) {
 
 func TestSessionRead(t *testing.T) {
 
-	t.Run("call restore and get from support interfaces", func(t *testing.T) {
-		sessionBuilder := &spySessionBuilder{}
-		sessionStorage := &spySessionStorage{builder: sessionBuilder}
+	t.Run("tell storage to get session", func(t *testing.T) {
+		sessionStorage := &spySessionStorage{}
 
-		provider := &DefaultProvider{sessionBuilder, sessionStorage, dummyAdapter}
+		provider := &DefaultProvider{sessionStorage, dummyAdapter}
 
 		_, err := provider.SessionRead("1")
 		assert.NoError(t, err)
 
-		if sessionStorage.callsToGet == 0 {
-			t.Error("didn't call storage to get")
-		}
-		if sessionBuilder.callsToRestore == 0 {
-			t.Fatal("didn't call builder to restore")
+		if sessionStorage.callsToGetSession == 0 {
+			t.Error("didn't tell storage")
 		}
 	})
 
-	sessionBuilder := &stubSessionBuilder{}
 	sessionStorage := &stubSessionStorage{
-		Sessions: map[string]Session{
+		Sessions: map[string]*stubSession{
 			"17af454": &stubSession{
 				Id: "17af454",
 			},
 		},
 	}
 
-	provider := &DefaultProvider{sessionBuilder, sessionStorage, dummyAdapter}
+	provider := &DefaultProvider{sessionStorage, dummyAdapter}
 
-	t.Run("returns stored session", func(t *testing.T) {
+	t.Run("returns session", func(t *testing.T) {
 		sid := "17af454"
 		session, err := provider.SessionRead(sid)
 
@@ -137,9 +127,8 @@ func TestSessionRead(t *testing.T) {
 		}
 	})
 	t.Run("returns error on failing session restoration", func(t *testing.T) {
-		sessionBuilder := &stubSessionBuilder{}
 		sessionStorage := &stubFailingSessionStorage{}
-		provider := &DefaultProvider{sessionBuilder, sessionStorage, dummyAdapter}
+		provider := &DefaultProvider{sessionStorage, dummyAdapter}
 
 		_, err := provider.SessionRead("17af454")
 
@@ -149,16 +138,15 @@ func TestSessionRead(t *testing.T) {
 
 func TestSessionDestroy(t *testing.T) {
 
-	sessionBuilder := &stubSessionBuilder{}
 	sessionStorage := &stubSessionStorage{
-		Sessions: map[string]Session{
+		Sessions: map[string]*stubSession{
 			"17af454": &stubSession{
 				Id: "17af454",
 			},
 		},
 	}
 
-	provider := &DefaultProvider{sessionBuilder, sessionStorage, dummyAdapter}
+	provider := &DefaultProvider{sessionStorage, dummyAdapter}
 
 	t.Run("destroys session", func(t *testing.T) {
 		sid := "17af454"
@@ -171,9 +159,8 @@ func TestSessionDestroy(t *testing.T) {
 		}
 	})
 	t.Run("returns error for destroy failing", func(t *testing.T) {
-		sessionBuilder := &stubSessionBuilder{}
 		sessionStorage := &stubFailingSessionStorage{}
-		provider := &DefaultProvider{sessionBuilder, sessionStorage, dummyAdapter}
+		provider := &DefaultProvider{sessionStorage, dummyAdapter}
 
 		err := provider.SessionDestroy("17af454")
 
@@ -188,20 +175,19 @@ func TestSessionGC(t *testing.T) {
 		sid1 := "17af450"
 		sid2 := "17af454"
 
-		sessionBuilder := &stubSessionBuilder{}
 		sessionStorage := &stubSessionStorage{
-			Sessions: map[string]Session{},
+			Sessions: map[string]*stubSession{},
 		}
 
-		provider := &DefaultProvider{sessionBuilder, sessionStorage, func(maxAge int64) AgeChecker {
+		provider := &DefaultProvider{sessionStorage, func(maxAge int64) AgeChecker {
 			return stubMilliAgeChecker(maxAge)
 		}}
 
-		sessionStorage.Sessions[sid1] = newStubSession(sid1, time.Now(), nil)
+		sessionStorage.Sessions[sid1] = newStubSession(sid1)
 
 		time.Sleep(2 * time.Millisecond)
 
-		sessionStorage.Sessions[sid2] = newStubSession(sid2, time.Now(), nil)
+		sessionStorage.Sessions[sid2] = newStubSession(sid2)
 
 		provider.SessionGC(1)
 

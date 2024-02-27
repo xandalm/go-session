@@ -5,22 +5,15 @@ import (
 	"time"
 )
 
-type SessionValues map[string]any
-
-type SessionBuilder interface {
-	Build(sid string, storage Storage) Session
-	Restore(sid string, creationTime time.Time, values SessionValues, onSessionUpdate func(Session) error) (Session, error)
-}
-
 type AgeChecker interface {
 	ShouldReap(time.Time) bool
 }
 
 type Storage interface {
-	Save(Session) error
-	Get(sid string) (Session, error)
-	Rip(sid string) error
-	Reap(AgeChecker)
+	CreateSession(sid string) (Session, error)
+	GetSession(sid string) (Session, error)
+	ReapSession(sid string) error
+	Deadline(AgeChecker)
 }
 
 type AgeCheckerAdapter func(int64) AgeChecker
@@ -37,17 +30,15 @@ var SecondsAgeCheckerAdapter AgeCheckerAdapter = func(maxAge int64) AgeChecker {
 }
 
 type DefaultProvider struct {
-	builder           SessionBuilder
 	storage           Storage
 	ageCheckerAdapter AgeCheckerAdapter
 }
 
-func NewDefaultProvider(builder SessionBuilder, storage Storage, adapter AgeCheckerAdapter) *DefaultProvider {
+func NewDefaultProvider(storage Storage, adapter AgeCheckerAdapter) *DefaultProvider {
 	if adapter == nil {
 		adapter = SecondsAgeCheckerAdapter
 	}
 	return &DefaultProvider{
-		builder,
 		storage,
 		adapter,
 	}
@@ -73,23 +64,24 @@ func (p *DefaultProvider) SessionInit(sid string) (Session, error) {
 	if !ok {
 		return nil, ErrDuplicateSessionId
 	}
-	sess := p.builder.Build(sid, p.storage)
-	if err := p.storage.Save(sess); err != nil {
+	sess, err := p.storage.CreateSession(sid)
+	if err != nil {
 		return nil, ErrUnableToSaveSession
 	}
 	return sess, nil
 }
 
 func (p *DefaultProvider) ensureNonDuplication(sid string) (bool, error) {
-	found, err := p.storage.Get(sid)
+	found, err := p.storage.GetSession(sid)
+	res := found == nil
 	if err != nil {
 		return false, err
 	}
-	return found == nil, nil
+	return res, nil
 }
 
 func (p *DefaultProvider) SessionRead(sid string) (Session, error) {
-	sess, err := p.storage.Get(sid)
+	sess, err := p.storage.GetSession(sid)
 	if err != nil {
 		return nil, ErrUnableToRestoreSession
 	}
@@ -101,7 +93,7 @@ func (p *DefaultProvider) SessionRead(sid string) (Session, error) {
 }
 
 func (p *DefaultProvider) SessionDestroy(sid string) error {
-	err := p.storage.Rip(sid)
+	err := p.storage.ReapSession(sid)
 	if err != nil {
 		return ErrUnableToDestroySession
 	}
@@ -109,5 +101,5 @@ func (p *DefaultProvider) SessionDestroy(sid string) error {
 }
 
 func (p *DefaultProvider) SessionGC(maxAge int64) {
-	p.storage.Reap(p.ageCheckerAdapter(maxAge))
+	p.storage.Deadline(p.ageCheckerAdapter(maxAge))
 }
