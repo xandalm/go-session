@@ -42,6 +42,8 @@ func (s *mockServer) ServerHTTP(w http.ResponseWriter, r *http.Request) {
 		s.handleStartGame(w, r, sess)
 	case "/leave":
 		s.handleLeaveGame(w, r, sess)
+	case "/score":
+		s.handleScore(w, r, sess)
 	default:
 		w.WriteHeader(http.StatusNotFound)
 	}
@@ -98,6 +100,29 @@ func (s *mockServer) handleLeaveGame(w http.ResponseWriter, r *http.Request, ses
 
 	err := sess.Delete("score")
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+func (s *mockServer) handleScore(w http.ResponseWriter, r *http.Request, sess session.Session) {
+	logged, ok := sess.Get("logged").(bool)
+	if !ok || !logged {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	score, ok := sess.Get("score").(int)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	if r.Method == http.MethodGet {
+		fmt.Fprint(w, score)
+		return
+	}
+
+	if err := sess.Set("score", score+1); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
@@ -234,7 +259,7 @@ func TestSessionsWithMemoryStorage(t *testing.T) {
 
 	t.Run("start game", func(t *testing.T) {
 
-		request, _ := http.NewRequest(http.MethodPut, "http://foo.com/start", strings.NewReader(form.Encode()))
+		request, _ := http.NewRequest(http.MethodPost, "http://foo.com/start", nil)
 		cookieManager.WriteCookies(request)
 
 		response := httptest.NewRecorder()
@@ -242,9 +267,36 @@ func TestSessionsWithMemoryStorage(t *testing.T) {
 		assertHTTPStatus(t, response, http.StatusOK)
 	})
 
+	t.Run("score in the game", func(t *testing.T) {
+
+		request, _ := http.NewRequest(http.MethodPost, "http://foo.com/score", nil)
+		cookieManager.WriteCookies(request)
+
+		response := httptest.NewRecorder()
+		server.ServerHTTP(response, request)
+		assertHTTPStatus(t, response, http.StatusOK)
+	})
+
+	t.Run("get score", func(t *testing.T) {
+
+		request, _ := http.NewRequest(http.MethodGet, "http://foo.com/score", nil)
+		cookieManager.WriteCookies(request)
+
+		response := httptest.NewRecorder()
+		server.ServerHTTP(response, request)
+		assertHTTPStatus(t, response, http.StatusOK)
+
+		got := response.Body.String()
+		want := "1"
+
+		if got != want {
+			t.Errorf("got score %s, but want %s", got, want)
+		}
+	})
+
 	t.Run("leave from game", func(t *testing.T) {
 
-		request, _ := http.NewRequest(http.MethodPut, "http://foo.com/leave", strings.NewReader(form.Encode()))
+		request, _ := http.NewRequest(http.MethodPost, "http://foo.com/leave", nil)
 		cookieManager.WriteCookies(request)
 
 		response := httptest.NewRecorder()
