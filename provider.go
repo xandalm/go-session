@@ -73,11 +73,10 @@ func (p *DefaultProvider) SessionInit(sid string) (Session, error) {
 
 func (p *DefaultProvider) ensureNonDuplication(sid string) (bool, error) {
 	found, err := p.storage.GetSession(sid)
-	res := found == nil
 	if err != nil {
 		return false, err
 	}
-	return res, nil
+	return found == nil, nil
 }
 
 func (p *DefaultProvider) SessionRead(sid string) (Session, error) {

@@ -58,8 +58,10 @@ func (s *storage) CreateSession(sid string) (sessionpkg.Session, error) {
 func (s *storage) GetSession(sid string) (sessionpkg.Session, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	sess := s.sessions[sid]
-	return sess, nil
+	if sess, ok := s.sessions[sid]; ok {
+		return sess, nil
+	}
+	return nil, nil
 }
 
 func (s *storage) ReapSession(sid string) error {
