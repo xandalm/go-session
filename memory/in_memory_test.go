@@ -78,7 +78,7 @@ func TestSession_Delete(t *testing.T) {
 
 func TestStorage_CreateSession(t *testing.T) {
 	t.Run("create session", func(t *testing.T) {
-		storage := &storage{sessions: map[string]*session{}}
+		storage := newStorage()
 		sid := "abcde"
 
 		sess, err := storage.CreateSession(sid)
@@ -92,7 +92,7 @@ func TestStorage_CreateSession(t *testing.T) {
 		}
 	})
 	t.Run("panic on empty session id", func(t *testing.T) {
-		storage := &storage{sessions: map[string]*session{}}
+		storage := newStorage()
 		defer func() {
 			r := recover()
 			if r == nil || r != "session: empty sid (session id)" {
@@ -106,11 +106,10 @@ func TestStorage_CreateSession(t *testing.T) {
 func TestStorage_GetSession(t *testing.T) {
 	sid := "abcde"
 	sess := newSession(sid)
-	storage := &storage{
-		sessions: map[string]*session{
-			sess.id: sess,
-		},
-	}
+	storage := newStorage()
+
+	err := storage.insertSession(sess)
+	assert.NoError(t, err)
 
 	got, err := storage.GetSession(sid)
 
@@ -126,13 +125,12 @@ func TestStorage_GetSession(t *testing.T) {
 func TestStorage_ReapSession(t *testing.T) {
 	sid := "abcde"
 	sess := newSession(sid)
-	storage := &storage{
-		sessions: map[string]*session{
-			sess.id: sess,
-		},
-	}
+	storage := newStorage()
 
-	err := storage.ReapSession(sid)
+	err := storage.insertSession(sess)
+	assert.NoError(t, err)
+
+	err = storage.ReapSession(sid)
 
 	assert.NoError(t, err)
 
@@ -143,31 +141,50 @@ func TestStorage_ReapSession(t *testing.T) {
 
 func TestStorage_Deadline(t *testing.T) {
 
-	storage := &storage{sessions: map[string]*session{}}
+	var err error
+
+	storage := newStorage()
 
 	sess1 := newSession("abcde")
-	storage.sessions[sess1.id] = sess1
+	err = storage.insertSession(sess1)
+	assert.NoError(t, err)
 
 	sess2 := newSession("fghij")
-	storage.sessions[sess2.id] = sess2
+	err = storage.insertSession(sess2)
+	assert.NoError(t, err)
 
 	time.Sleep(time.Millisecond)
 
 	sess3 := newSession("klmno")
-	storage.sessions[sess3.id] = sess3
+	err = storage.insertSession(sess3)
+	assert.NoError(t, err)
 
-	checker := stubMilliAgeChecker(1)
+	t.Run("remove expired sessions only", func(t *testing.T) {
 
-	storage.Deadline(checker)
+		checker := stubMilliAgeChecker(1)
+		storage.Deadline(checker)
 
-	if len(storage.sessions) > 1 {
-		t.Fatal("didn't remove expired sessions")
-	}
+		if len(storage.sessions) > 1 {
+			t.Fatal("didn't remove expired sessions from storage.sessions")
+		}
 
-	got, ok := storage.sessions[sess3.id]
-	if !ok {
-		t.Errorf("expected session %q, but got %q", sess3.id, got.id)
-	}
+		if storage.list.Len() > 1 {
+			t.Fatal("didn't remove expired sessions from storage.list")
+		}
+
+		if storage.list.Len() != len(storage.sessions) {
+			t.Fatal("sessions and list length aren't the same")
+		}
+
+		if _, ok := storage.sessions[sess3.id]; !ok {
+			t.Fatalf("the session(%s) isn't in storage.sessions", sess3.id)
+		}
+
+		if storage.list.Back().Value.(*session).id != sess3.id {
+			t.Errorf("the session(%s) isn't in storage.list", sess3.id)
+		}
+	})
+
 }
 
 type stubMilliAgeChecker int64
