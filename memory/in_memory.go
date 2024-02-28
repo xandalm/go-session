@@ -9,16 +9,16 @@ import (
 )
 
 type session struct {
-	id string
-	v  map[string]any
-	ta time.Time
+	id string         // session id (sid)
+	v  map[string]any // mapped values
+	ct time.Time      // creationtime
 }
 
 func newSession(sid string) *session {
 	return &session{
 		id: sid,
 		v:  map[string]any{},
-		ta: time.Now(),
+		ct: time.Now(),
 	}
 }
 
@@ -98,7 +98,7 @@ func (s *storage) Deadline(checker sessionpkg.AgeChecker) {
 
 	for elem := s.list.Back(); elem != nil; elem = s.list.Back() {
 		sess := elem.Value.(*session)
-		if checker.ShouldReap(sess.ta) {
+		if checker.ShouldReap(sess.ct) {
 			delete(s.sessions, sess.id)
 			s.list.Remove(elem)
 			continue
