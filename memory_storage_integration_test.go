@@ -38,6 +38,10 @@ func (s *mockServer) ServerHTTP(w http.ResponseWriter, r *http.Request) {
 		s.handleLogIn(w, r, sess)
 	case "/players":
 		s.handleGetOnlinePlayers(w, r, sess)
+	case "/start":
+		s.handleStartGame(w, r, sess)
+	case "/leave":
+		s.handleLeaveGame(w, r, sess)
 	default:
 		w.WriteHeader(http.StatusNotFound)
 	}
@@ -70,6 +74,32 @@ func (s *mockServer) handleGetOnlinePlayers(w http.ResponseWriter, r *http.Reque
 	}
 
 	fmt.Fprint(w, strings.Join(s.players, ","))
+}
+
+func (s *mockServer) handleStartGame(w http.ResponseWriter, r *http.Request, sess session.Session) {
+	logged, ok := sess.Get("logged").(bool)
+	if !ok || !logged {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	err := sess.Set("score", 0)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+func (s *mockServer) handleLeaveGame(w http.ResponseWriter, r *http.Request, sess session.Session) {
+	logged, ok := sess.Get("logged").(bool)
+	if !ok || !logged {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	err := sess.Delete("score")
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 }
 
 type stubCookieManager struct {
@@ -200,6 +230,26 @@ func TestSessionsWithMemoryStorage(t *testing.T) {
 		if got != want {
 			t.Errorf("got players %s, but want %s", got, want)
 		}
+	})
+
+	t.Run("start game", func(t *testing.T) {
+
+		request, _ := http.NewRequest(http.MethodPut, "http://foo.com/start", strings.NewReader(form.Encode()))
+		cookieManager.WriteCookies(request)
+
+		response := httptest.NewRecorder()
+		server.ServerHTTP(response, request)
+		assertHTTPStatus(t, response, http.StatusOK)
+	})
+
+	t.Run("leave from game", func(t *testing.T) {
+
+		request, _ := http.NewRequest(http.MethodPut, "http://foo.com/leave", strings.NewReader(form.Encode()))
+		cookieManager.WriteCookies(request)
+
+		response := httptest.NewRecorder()
+		server.ServerHTTP(response, request)
+		assertHTTPStatus(t, response, http.StatusOK)
 	})
 
 	t.Run("logoff player after session expires", func(t *testing.T) {
