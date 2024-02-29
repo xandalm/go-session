@@ -3,6 +3,8 @@ package filesystem
 import (
 	"testing"
 	"time"
+
+	"github.com/xandalm/go-session/testing/assert"
 )
 
 func TestSession_SessionID(t *testing.T) {
@@ -43,5 +45,24 @@ func TestSession_Get(t *testing.T) {
 			t.Errorf("expected nil, got %v", got)
 		}
 	})
+}
 
+func TestSession_Set(t *testing.T) {
+	sess := &session{
+		id: "abcde",
+		v:  map[string]any{},
+		ct: time.Now(),
+	}
+	err := sess.Set("foo", "bar")
+
+	assert.NoError(t, err)
+	want := "bar"
+
+	if got, ok := sess.v["foo"]; ok {
+		if got != want {
+			t.Errorf("got value %q, but want %q", got, want)
+		}
+		return
+	}
+	t.Error("didn't set value")
 }

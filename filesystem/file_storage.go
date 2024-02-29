@@ -15,3 +15,8 @@ func (s *session) SessionID() string {
 func (s *session) Get(key string) any {
 	return s.v[key]
 }
+
+func (s *session) Set(key string, value any) error {
+	s.v[key] = value
+	return nil
+}
