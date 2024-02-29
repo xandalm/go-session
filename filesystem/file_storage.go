@@ -20,3 +20,8 @@ func (s *session) Set(key string, value any) error {
 	s.v[key] = value
 	return nil
 }
+
+func (s *session) Delete(key string) error {
+	delete(s.v, key)
+	return nil
+}

@@ -66,3 +66,19 @@ func TestSession_Set(t *testing.T) {
 	}
 	t.Error("didn't set value")
 }
+
+func TestSession_Delete(t *testing.T) {
+	sess := &session{
+		id: "abcde",
+		v:  map[string]any{"key": 123},
+		ct: time.Now(),
+	}
+
+	err := sess.Delete("key")
+
+	assert.NoError(t, err)
+
+	if _, ok := sess.v["key"]; ok {
+		t.Error("didn't delete value")
+	}
+}
