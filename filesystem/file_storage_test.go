@@ -1,6 +1,7 @@
 package filesystem
 
 import (
+	"os"
 	"testing"
 	"time"
 
@@ -81,4 +82,27 @@ func TestSession_Delete(t *testing.T) {
 	if _, ok := sess.v["key"]; ok {
 		t.Error("didn't delete value")
 	}
+}
+
+func TestStorage_CreateSession(t *testing.T) {
+	t.Run("create session", func(t *testing.T) {
+		storage := &storage{}
+
+		sid := "abcde"
+		got, err := storage.CreateSession(sid)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, got)
+
+		sess, ok := got.(*session)
+		if !ok {
+			t.Fatalf("didn't got session type")
+		}
+		if sess.id != sid {
+			t.Fatalf("got session id %q, but want %q", sess.id, sid)
+		}
+		if _, err := os.ReadFile(sid + ".sess"); err != nil {
+			t.Fatal("cannot open session file")
+		}
+	})
 }
