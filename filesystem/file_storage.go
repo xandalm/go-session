@@ -2,6 +2,7 @@ package filesystem
 
 import (
 	"os"
+	"path/filepath"
 	"time"
 
 	sessionpkg "github.com/xandalm/go-session"
@@ -31,14 +32,29 @@ func (s *session) Delete(key string) error {
 	return nil
 }
 
-type storage struct{}
+type storage struct {
+	path string
+}
+
+func NewStorage(path string, dir string) *storage {
+	path, err := filepath.Abs(path)
+	if err == nil {
+		path = filepath.Join(path, dir)
+		err = os.MkdirAll(path, 0750)
+		if err == nil || os.IsExist(err) {
+			return &storage{path}
+		}
+	}
+	panic("session: cannot make sessions storage folder")
+}
 
 func (s *storage) CreateSession(sid string) (sessionpkg.Session, error) {
-	fileName := sid + ".sess"
-	file, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0666)
+	filePath := filepath.Join(s.path, sid+".sess")
+	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		return nil, err
 	}
+	defer file.Close()
 	fileInfo, err := file.Stat()
 	if err != nil {
 		return nil, err

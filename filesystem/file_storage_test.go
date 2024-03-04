@@ -1,7 +1,9 @@
 package filesystem
 
 import (
+	"log"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -86,11 +88,12 @@ func TestSession_Delete(t *testing.T) {
 
 func TestStorage_CreateSession(t *testing.T) {
 	t.Run("create session", func(t *testing.T) {
-		storage := &storage{}
+		path := ""
+		dir := "sessions"
+		storage := NewStorage(path, dir)
 
 		sid := "abcde"
 		got, err := storage.CreateSession(sid)
-
 		assert.NoError(t, err)
 		assert.NotNil(t, got)
 
@@ -101,8 +104,17 @@ func TestStorage_CreateSession(t *testing.T) {
 		if sess.id != sid {
 			t.Fatalf("got session id %q, but want %q", sess.id, sid)
 		}
-		if _, err := os.ReadFile(sid + ".sess"); err != nil {
+		if _, err := os.ReadFile(joinPath(path, dir, sid+".sess")); err != nil {
 			t.Fatal("cannot open session file")
 		}
+		t.Cleanup(func() {
+			if err := os.RemoveAll(joinPath(path, dir)); err != nil {
+				log.Fatalf("didn't complete clean up, %v", err)
+			}
+		})
 	})
+}
+
+func joinPath(v ...string) string {
+	return filepath.Join(v...)
 }
