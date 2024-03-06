@@ -1,12 +1,12 @@
 package filesystem
 
 import (
-	"bufio"
+	"bytes"
+	"encoding/gob"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"time"
 
 	sessionpkg "github.com/xandalm/go-session"
@@ -16,6 +16,23 @@ type session struct {
 	id string
 	v  map[string]any
 	ct time.Time
+	at time.Time
+}
+
+func (s *session) MarshalBinary() ([]byte, error) {
+	var b bytes.Buffer
+	fmt.Fprintln(&b, s.ct.UnixNano(), s.at.UnixNano())
+	return b.Bytes(), nil
+}
+
+func (s *session) UnmarshalBinary(data []byte) error {
+	b := bytes.NewBuffer(data)
+	var cts int64
+	var ats int64
+	_, err := fmt.Fscanln(b, &cts, &ats)
+	s.ct = time.Unix(0, cts)
+	s.at = time.Unix(0, ats)
+	return err
 }
 
 func (s *session) SessionID() string {
@@ -76,31 +93,25 @@ func (s *storage) GetSession(sid string) (sessionpkg.Session, error) {
 		return nil, err
 	}
 	defer file.Close()
-	creationTime, _, err := s.readSession(file)
+	sess, err := s.readSession(file)
 	if err != nil {
 		return nil, err
 	}
-	return &session{
-		id: sid,
-		ct: *creationTime,
-	}, nil
+	sess.id = sid
+	return sess, nil
 }
 
-func (s *storage) readSession(r io.Reader) (*time.Time, *time.Time, error) {
-	scanner := bufio.NewScanner(r)
+func (s *storage) readSession(r io.Reader) (*session, error) {
 
-	readLine := func(tag string) string {
-		scanner.Scan()
-		return strings.TrimPrefix(scanner.Text(), tag)
+	var sess session
+	dec := gob.NewDecoder(r)
+
+	err := dec.Decode(&sess)
+	if err != nil && err != io.EOF {
+		return nil, err
 	}
 
-	nsec, _ := strconv.Atoi(readLine("CREATIONTIME: "))
-	ct := time.Unix(0, int64(nsec))
-
-	nsec, _ = strconv.Atoi(readLine("ACCESSTIME: "))
-	at := time.Unix(0, int64(nsec))
-
-	return &ct, &at, nil
+	return &sess, nil
 }
 
 func (s storage) filePath(sid string) string {

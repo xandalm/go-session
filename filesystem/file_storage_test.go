@@ -1,11 +1,11 @@
 package filesystem
 
 import (
-	"fmt"
+	"bytes"
+	"encoding/gob"
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -118,6 +118,44 @@ func TestCreatingSessionInStorage(t *testing.T) {
 	})
 }
 
+func TestReadSession(t *testing.T) {
+	dummyPath := ""
+	dummyDir := "sessions"
+	dummyExt := "sess"
+
+	now := time.Now()
+	sess := &session{
+		id: "abcde",
+		v:  map[string]any{},
+		ct: now,
+		at: now,
+	}
+
+	var buf bytes.Buffer
+
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(sess)
+	if err != nil {
+		log.Fatalf("expected no error, %v", err)
+	}
+
+	storage := NewStorage(dummyPath, dummyDir, dummyExt)
+
+	got, err := storage.readSession(&buf)
+
+	assert.NoError(t, err)
+	assert.NotEmpty(t, got.ct)
+	assert.NotEmpty(t, got.at)
+
+	if !sess.ct.Equal(got.ct) {
+		t.Fatalf("got creation time %s, but want %s", got.ct, sess.ct)
+	}
+
+	if !sess.at.Equal(got.at) {
+		t.Errorf("got access time %s, but want %s", got.at, sess.at)
+	}
+}
+
 func TestGettingSessionFromStorage(t *testing.T) {
 	path := ""
 	dir := "sessions"
@@ -155,31 +193,6 @@ func TestGettingSessionFromStorage(t *testing.T) {
 			log.Fatalf("didn't complete clean up, %v", err)
 		}
 	})
-}
-
-func TestReadSession(t *testing.T) {
-	dummyPath := ""
-	dummyDir := "sessions"
-	dummyExt := "sess"
-
-	ctIn := time.Now().UnixNano()
-	atIn := ctIn
-	r := strings.NewReader(fmt.Sprintf("CREATIONTIME: %d\nACCESSTIME: %d\n", ctIn, atIn))
-
-	storage := NewStorage(dummyPath, dummyDir, dummyExt)
-
-	ctOut, atOut, err := storage.readSession(r)
-
-	assert.NoError(t, err)
-	assert.NotNil(t, ctOut)
-
-	if ctIn != ctOut.UnixNano() {
-		t.Errorf("got creation time %dns, but want %dns", ctOut.UnixNano(), ctIn)
-	}
-
-	if atIn != atOut.UnixNano() {
-		t.Errorf("got creation time %v, but want %v", atOut.UnixNano(), atIn)
-	}
 }
 
 func joinPath(v ...string) string {
