@@ -76,15 +76,11 @@ func (s *storage) CreateSession(sid string) (sessionpkg.Session, error) {
 		return nil, err
 	}
 	defer file.Close()
-	fileInfo, err := file.Stat()
-	if err != nil {
+	sess := &session{id: sid, v: map[string]any{}}
+	if err := s.createSession(file, sess); err != nil {
 		return nil, err
 	}
-	return &session{
-		id: sid,
-		v:  map[string]any{},
-		ct: fileInfo.ModTime(),
-	}, nil
+	return sess, nil
 }
 
 func (s *storage) GetSession(sid string) (sessionpkg.Session, error) {
@@ -112,6 +108,18 @@ func (s *storage) readSession(r io.Reader) (*session, error) {
 	}
 
 	return &sess, nil
+}
+
+func (s *storage) createSession(w io.Writer, sess *session) error {
+
+	enc := gob.NewEncoder(w)
+
+	now := time.Now()
+	sess.ct = now
+	sess.at = now
+
+	err := enc.Encode(sess)
+	return err
 }
 
 func (s storage) filePath(sid string) string {
