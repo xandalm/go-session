@@ -3,9 +3,11 @@ package filesystem
 import (
 	"bytes"
 	"encoding/gob"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -58,18 +60,33 @@ func TestSetValueFromSession(t *testing.T) {
 		v:  map[string]any{},
 		ct: time.Now(),
 	}
-	err := sess.Set("foo", "bar")
 
-	assert.NoError(t, err)
-	want := "bar"
-
-	if got, ok := sess.v["foo"]; ok {
-		if got != want {
-			t.Errorf("got value %q, but want %q", got, want)
-		}
-		return
+	cases := []struct {
+		typ   string
+		value any
+		want  any
+	}{
+		{"string", "bar", "bar"},
+		{"int", 1, 1},
+		{"struct", struct{ Id int }{10}, map[string]any{"Id": 10}},
+		{"map[string]int", map[string]int{"a": 1}, map[string]any{"a": 1}},
 	}
-	t.Error("didn't set value")
+
+	for _, c := range cases {
+		t.Run(fmt.Sprintf("set %s value", c.typ), func(t *testing.T) {
+			err := sess.Set("foo", c.value)
+
+			assert.NoError(t, err)
+
+			if got, ok := sess.v["foo"]; ok {
+				if !reflect.DeepEqual(got, c.want) {
+					t.Errorf("set value to %v, but want %v", got, c.want)
+				}
+				return
+			}
+			t.Error("didn't set value")
+		})
+	}
 }
 
 func TestDeleteValueFromSession(t *testing.T) {
@@ -124,9 +141,12 @@ func TestReadSession(t *testing.T) {
 	dummyExt := "sess"
 
 	now := time.Now()
+
 	sess := &session{
 		id: "abcde",
-		v:  map[string]any{},
+		v: map[string]any{
+			"int": 1,
+		},
 		ct: now,
 		at: now,
 	}
@@ -134,7 +154,11 @@ func TestReadSession(t *testing.T) {
 	var buf bytes.Buffer
 
 	enc := gob.NewEncoder(&buf)
-	err := enc.Encode(sess)
+	err := enc.Encode(&extSession{
+		V:  sess.v,
+		Ct: sess.ct.UnixNano(),
+		At: sess.at.UnixNano(),
+	})
 	if err != nil {
 		log.Fatalf("expected no error, %v", err)
 	}
@@ -152,7 +176,11 @@ func TestReadSession(t *testing.T) {
 	}
 
 	if !sess.at.Equal(got.at) {
-		t.Errorf("got access time %s, but want %s", got.at, sess.at)
+		t.Fatalf("got access time %s, but want %s", got.at, sess.at)
+	}
+
+	if !reflect.DeepEqual(got.v, sess.v) {
+		t.Errorf("got values %+v, but want %+v", got.v, sess.v)
 	}
 }
 

@@ -1,12 +1,11 @@
 package filesystem
 
 import (
-	"bytes"
 	"encoding/gob"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"time"
 
 	sessionpkg "github.com/xandalm/go-session"
@@ -19,20 +18,9 @@ type session struct {
 	at time.Time
 }
 
-func (s *session) MarshalBinary() ([]byte, error) {
-	var b bytes.Buffer
-	fmt.Fprintln(&b, s.ct.UnixNano(), s.at.UnixNano())
-	return b.Bytes(), nil
-}
-
-func (s *session) UnmarshalBinary(data []byte) error {
-	b := bytes.NewBuffer(data)
-	var cts int64
-	var ats int64
-	_, err := fmt.Fscanln(b, &cts, &ats)
-	s.ct = time.Unix(0, cts)
-	s.at = time.Unix(0, ats)
-	return err
+type extSession struct {
+	V      map[string]any
+	Ct, At int64
 }
 
 func (s *session) SessionID() string {
@@ -44,8 +32,37 @@ func (s *session) Get(key string) any {
 }
 
 func (s *session) Set(key string, value any) error {
-	s.v[key] = value
+	rValue := reflect.ValueOf(value)
+	for rValue.Kind() == reflect.Pointer {
+		rValue = reflect.Indirect(rValue)
+	}
+	s.v[key] = s.walk(rValue)
 	return nil
+}
+
+func (s *session) walk(v reflect.Value) any {
+	switch v.Kind() {
+	case reflect.Struct:
+		vFields := reflect.VisibleFields(v.Type())
+		m := map[string]any{}
+		for _, f := range vFields {
+			fValue := v.FieldByName(f.Name)
+			if fValue.Kind() == reflect.Struct || fValue.Kind() == reflect.Map {
+				m[f.Name] = s.walk(fValue)
+			} else {
+				m[f.Name] = fValue.Interface()
+			}
+		}
+		return m
+	case reflect.Map:
+		m := map[string]any{}
+		for _, k := range v.MapKeys() {
+			m[k.String()] = s.walk(v.MapIndex(k))
+		}
+		return m
+	default:
+		return v.Interface()
+	}
 }
 
 func (s *session) Delete(key string) error {
@@ -99,15 +116,20 @@ func (s *storage) GetSession(sid string) (sessionpkg.Session, error) {
 
 func (s *storage) readSession(r io.Reader) (*session, error) {
 
-	var sess session
+	var esess extSession
+
 	dec := gob.NewDecoder(r)
 
-	err := dec.Decode(&sess)
+	err := dec.Decode(&esess)
 	if err != nil && err != io.EOF {
 		return nil, err
 	}
 
-	return &sess, nil
+	return &session{
+		ct: time.Unix(0, esess.Ct),
+		at: time.Unix(0, esess.At),
+		v:  esess.V,
+	}, nil
 }
 
 func (s *storage) createSession(w io.Writer, sess *session) error {
@@ -118,10 +140,17 @@ func (s *storage) createSession(w io.Writer, sess *session) error {
 	sess.ct = now
 	sess.at = now
 
-	err := enc.Encode(sess)
+	err := enc.Encode(&extSession{
+		Ct: now.UnixNano(),
+		At: now.UnixNano(),
+	})
 	return err
 }
 
 func (s storage) filePath(sid string) string {
 	return filepath.Join(s.path, sid+"."+s.ext)
+}
+
+func init() {
+	gob.Register(map[string]any{})
 }
