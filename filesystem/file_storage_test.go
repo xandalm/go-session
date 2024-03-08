@@ -87,6 +87,24 @@ func TestSetValueFromSession(t *testing.T) {
 			t.Error("didn't set value")
 		})
 	}
+	t.Run("panic when try to set a func", func(t *testing.T) {
+		defer func() {
+			r := recover()
+			if r == nil || r != "session: cannot stores func into session" {
+				t.Errorf("didn't get expected panic, got %v", r)
+			}
+		}()
+		sess.Set("foo", func() any { return "foo" })
+	})
+	t.Run("panic when try to set a chan", func(t *testing.T) {
+		defer func() {
+			r := recover()
+			if r == nil || r != "session: cannot stores chan into session" {
+				t.Errorf("didn't get expected panic, got %v", r)
+			}
+		}()
+		sess.Set("foo", make(chan int))
+	})
 }
 
 func TestDeleteValueFromSession(t *testing.T) {

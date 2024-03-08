@@ -36,19 +36,23 @@ func (s *session) Set(key string, value any) error {
 	for rValue.Kind() == reflect.Pointer {
 		rValue = reflect.Indirect(rValue)
 	}
-	s.v[key] = s.walk(rValue)
+	s.v[key] = s.mapped(rValue)
 	return nil
 }
 
-func (s *session) walk(v reflect.Value) any {
+func (s *session) mapped(v reflect.Value) any {
 	switch v.Kind() {
+	case reflect.Func:
+		panic("session: cannot stores func into session")
+	case reflect.Chan:
+		panic("session: cannot stores chan into session")
 	case reflect.Struct:
 		vFields := reflect.VisibleFields(v.Type())
 		m := map[string]any{}
 		for _, f := range vFields {
 			fValue := v.FieldByName(f.Name)
 			if fValue.Kind() == reflect.Struct || fValue.Kind() == reflect.Map {
-				m[f.Name] = s.walk(fValue)
+				m[f.Name] = s.mapped(fValue)
 			} else {
 				m[f.Name] = fValue.Interface()
 			}
@@ -57,7 +61,7 @@ func (s *session) walk(v reflect.Value) any {
 	case reflect.Map:
 		m := map[string]any{}
 		for _, k := range v.MapKeys() {
-			m[k.String()] = s.walk(v.MapIndex(k))
+			m[k.String()] = s.mapped(v.MapIndex(k))
 		}
 		return m
 	default:
