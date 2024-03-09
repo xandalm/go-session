@@ -150,6 +150,15 @@ func (sio *stubStorageIO) Read(sid string) (*session, error) {
 	return nil, nil
 }
 
+func (sio *stubStorageIO) Write(sess *session) error {
+	return nil
+}
+
+func (sio *stubStorageIO) Delete(sid string) error {
+	delete(sio.regs, sid)
+	return nil
+}
+
 func TestCreatingSessionInStorage(t *testing.T) {
 	t.Run("create session", func(t *testing.T) {
 		io := &stubStorageIO{map[string]*extSession{}}
@@ -204,6 +213,32 @@ func TestGettingSessionFromStorage(t *testing.T) {
 		}
 		if sess.id != sid {
 			t.Fatalf("got session id %q, but want %q", sess.id, sid)
+		}
+	})
+}
+
+func TestReapingSessionFromStorage(t *testing.T) {
+	t.Run("removes session", func(t *testing.T) {
+
+		sid := "abcde"
+
+		io := &stubStorageIO{
+			map[string]*extSession{
+				sid: {
+					V:  map[string]any{},
+					Ct: time.Now().UnixNano(),
+					At: time.Now().UnixNano(),
+				},
+			},
+		}
+		storage := &storage{io}
+
+		err := storage.ReapSession(sid)
+
+		assert.NoError(t, err)
+
+		if _, ok := io.regs[sid]; ok {
+			t.Error("didn't remove session")
 		}
 	})
 }

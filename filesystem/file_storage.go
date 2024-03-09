@@ -78,6 +78,8 @@ func (s *session) Delete(key string) error {
 type storageIO interface {
 	Create(sid string) (*session, error)
 	Read(sid string) (*session, error)
+	Write(sess *session) error
+	Delete(sid string) error
 }
 
 type defaultStorageIO struct {
@@ -160,6 +162,14 @@ func (sio defaultStorageIO) Read(sid string) (*session, error) {
 	return sess, nil
 }
 
+func (sio defaultStorageIO) Write(sess *session) error {
+	panic("not implemented")
+}
+
+func (sio defaultStorageIO) Delete(sid string) error {
+	panic("not implemented")
+}
+
 func (sio defaultStorageIO) filePath(sid string) string {
 	return filepath.Join(sio.path, sid+"."+sio.ext)
 }
@@ -187,6 +197,10 @@ func (s *storage) GetSession(sid string) (sessionpkg.Session, error) {
 		return nil, err
 	}
 	return sess, nil
+}
+
+func (s *storage) ReapSession(sid string) error {
+	return s.io.Delete(sid)
 }
 
 func init() {
