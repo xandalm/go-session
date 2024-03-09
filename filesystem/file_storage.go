@@ -2,6 +2,7 @@ package filesystem
 
 import (
 	"encoding/gob"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -74,51 +75,60 @@ func (s *session) Delete(key string) error {
 	return nil
 }
 
-type storage struct {
+type storageIO interface {
+	Create(sid string) (*session, error)
+	Read(sid string) (*session, error)
+}
+
+type defaultStorageIO struct {
 	path string
 	ext  string
 }
 
-func NewStorage(path, dir, ext string) *storage {
+func newStorageIO(path, dir, ext string) *defaultStorageIO {
 	path, err := filepath.Abs(path)
 	if err == nil {
 		path = filepath.Join(path, dir)
 		err = os.MkdirAll(path, 0750)
 		if err == nil || os.IsExist(err) {
-			return &storage{path, ext}
+			return &defaultStorageIO{
+				path,
+				ext,
+			}
 		}
 	}
-	panic("session: cannot make sessions storage folder")
+	panic(fmt.Errorf("session: cannot make sessions storage folder, %v", err))
 }
 
-func (s *storage) CreateSession(sid string) (sessionpkg.Session, error) {
-	file, err := os.OpenFile(s.filePath(sid), os.O_RDWR|os.O_CREATE, 0666)
+func (s defaultStorageIO) create(w io.Writer, sess *session) error {
+
+	enc := gob.NewEncoder(w)
+
+	now := time.Now()
+	sess.ct = now
+	sess.at = now
+
+	err := enc.Encode(&extSession{
+		Ct: now.UnixNano(),
+		At: now.UnixNano(),
+	})
+	return err
+}
+
+func (sio defaultStorageIO) Create(sid string) (*session, error) {
+	file, err := os.OpenFile(sio.filePath(sid), os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 	sess := &session{id: sid, v: map[string]any{}}
-	if err := s.createSession(file, sess); err != nil {
+	if err := sio.create(file, sess); err != nil {
 		return nil, err
 	}
 	return sess, nil
 }
 
-func (s *storage) GetSession(sid string) (sessionpkg.Session, error) {
-	file, err := os.Open(s.filePath(sid))
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-	sess, err := s.readSession(file)
-	if err != nil {
-		return nil, err
-	}
-	sess.id = sid
-	return sess, nil
-}
-
-func (s *storage) readSession(r io.Reader) (*session, error) {
+func (sio defaultStorageIO) read(r io.Reader) (*session, error) {
 
 	var esess extSession
 
@@ -136,23 +146,47 @@ func (s *storage) readSession(r io.Reader) (*session, error) {
 	}, nil
 }
 
-func (s *storage) createSession(w io.Writer, sess *session) error {
-
-	enc := gob.NewEncoder(w)
-
-	now := time.Now()
-	sess.ct = now
-	sess.at = now
-
-	err := enc.Encode(&extSession{
-		Ct: now.UnixNano(),
-		At: now.UnixNano(),
-	})
-	return err
+func (sio defaultStorageIO) Read(sid string) (*session, error) {
+	file, err := os.Open(sio.filePath(sid))
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	sess, err := sio.read(file)
+	if err != nil {
+		return nil, err
+	}
+	sess.id = sid
+	return sess, nil
 }
 
-func (s storage) filePath(sid string) string {
-	return filepath.Join(s.path, sid+"."+s.ext)
+func (sio defaultStorageIO) filePath(sid string) string {
+	return filepath.Join(sio.path, sid+"."+sio.ext)
+}
+
+type storage struct {
+	io storageIO
+}
+
+func NewStorage(path, dir, ext string) *storage {
+	io := newStorageIO(path, dir, ext)
+	return &storage{io}
+}
+
+func (s *storage) CreateSession(sid string) (sessionpkg.Session, error) {
+	sess, err := s.io.Create(sid)
+	if err != nil {
+		return nil, err
+	}
+	return sess, nil
+}
+
+func (s *storage) GetSession(sid string) (sessionpkg.Session, error) {
+	sess, err := s.io.Read(sid)
+	if err != nil {
+		return nil, err
+	}
+	return sess, nil
 }
 
 func init() {

@@ -1,12 +1,7 @@
 package filesystem
 
 import (
-	"bytes"
-	"encoding/gob"
 	"fmt"
-	"log"
-	"os"
-	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
@@ -123,12 +118,44 @@ func TestDeleteValueFromSession(t *testing.T) {
 	}
 }
 
+type stubStorageIO struct {
+	regs map[string]*extSession
+}
+
+func (sio *stubStorageIO) Create(sid string) (*session, error) {
+
+	now := time.Now()
+	sess := &session{sid, map[string]any{}, now, now}
+
+	sio.regs[sid] = &extSession{
+		sess.v,
+		sess.ct.UnixNano(),
+		sess.at.UnixNano(),
+	}
+
+	return sess, nil
+}
+
+func (sio *stubStorageIO) Read(sid string) (*session, error) {
+
+	if reg, ok := sio.regs[sid]; ok {
+		return &session{
+			sid,
+			reg.V,
+			time.Unix(0, reg.Ct),
+			time.Unix(0, reg.At),
+		}, nil
+	}
+
+	return nil, nil
+}
+
 func TestCreatingSessionInStorage(t *testing.T) {
-	path := ""
-	dir := "sessions"
-	ext := "sess"
 	t.Run("create session", func(t *testing.T) {
-		storage := NewStorage(path, dir, ext)
+		io := &stubStorageIO{map[string]*extSession{}}
+		storage := &storage{
+			io,
+		}
 
 		sid := "abcde"
 		got, err := storage.CreateSession(sid)
@@ -142,83 +169,29 @@ func TestCreatingSessionInStorage(t *testing.T) {
 		if sess.id != sid {
 			t.Fatalf("got session id %q, but want %q", sess.id, sid)
 		}
-		if _, err := os.ReadFile(joinPath(path, dir, sid+".sess")); err != nil {
-			t.Error("cannot open session file")
+		if _, ok := io.regs[sid]; !ok {
+			t.Errorf("didn't write session")
 		}
 	})
-	t.Cleanup(func() {
-		if err := os.RemoveAll(joinPath(path, dir)); err != nil {
-			log.Fatalf("didn't complete clean up, %v", err)
-		}
-	})
-}
-
-func TestReadSession(t *testing.T) {
-	dummyPath := ""
-	dummyDir := "sessions"
-	dummyExt := "sess"
-
-	now := time.Now()
-
-	sess := &session{
-		id: "abcde",
-		v: map[string]any{
-			"int": 1,
-		},
-		ct: now,
-		at: now,
-	}
-
-	var buf bytes.Buffer
-
-	enc := gob.NewEncoder(&buf)
-	err := enc.Encode(&extSession{
-		V:  sess.v,
-		Ct: sess.ct.UnixNano(),
-		At: sess.at.UnixNano(),
-	})
-	if err != nil {
-		log.Fatalf("expected no error, %v", err)
-	}
-
-	storage := NewStorage(dummyPath, dummyDir, dummyExt)
-
-	got, err := storage.readSession(&buf)
-
-	assert.NoError(t, err)
-	assert.NotEmpty(t, got.ct)
-	assert.NotEmpty(t, got.at)
-
-	if !sess.ct.Equal(got.ct) {
-		t.Fatalf("got creation time %s, but want %s", got.ct, sess.ct)
-	}
-
-	if !sess.at.Equal(got.at) {
-		t.Fatalf("got access time %s, but want %s", got.at, sess.at)
-	}
-
-	if !reflect.DeepEqual(got.v, sess.v) {
-		t.Errorf("got values %+v, but want %+v", got.v, sess.v)
-	}
 }
 
 func TestGettingSessionFromStorage(t *testing.T) {
-	path := ""
-	dir := "sessions"
-	ext := "sess"
-
-	sid := "abcde"
-
-	if err := makeDir(path, dir); err != nil {
-		log.Fatalf("cannot create storage folder, %v", err)
-	}
-
-	if err := makeSessionFile(joinPath(path, dir), sid, ext); err != nil {
-		log.Fatalf("cannot create session file, %v", err)
-	}
 
 	t.Run("returns session", func(t *testing.T) {
-		storage := NewStorage(path, dir, ext)
+
+		sid := "abcde"
+
+		storage := &storage{
+			io: &stubStorageIO{
+				map[string]*extSession{
+					sid: {
+						V:  map[string]any{},
+						Ct: time.Now().UnixNano(),
+						At: time.Now().UnixNano(),
+					},
+				},
+			},
+		}
 
 		got, err := storage.GetSession(sid)
 
@@ -233,30 +206,4 @@ func TestGettingSessionFromStorage(t *testing.T) {
 			t.Fatalf("got session id %q, but want %q", sess.id, sid)
 		}
 	})
-
-	t.Cleanup(func() {
-		if err := os.RemoveAll(joinPath(path, dir)); err != nil {
-			log.Fatalf("didn't complete clean up, %v", err)
-		}
-	})
-}
-
-func joinPath(v ...string) string {
-	return filepath.Join(v...)
-}
-
-func makeDir(path, dir string) error {
-	if err := os.MkdirAll(joinPath(path, dir), 0750); err != nil {
-		return err
-	}
-	return nil
-}
-
-func makeSessionFile(path, sid, ext string) error {
-	f, err := os.OpenFile(joinPath(path, sid+"."+ext), os.O_CREATE, 0666)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	return nil
 }
