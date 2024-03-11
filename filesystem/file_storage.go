@@ -80,6 +80,7 @@ type storageIO interface {
 	Read(sid string) (*session, error)
 	Write(sess *session) error
 	Delete(sid string) error
+	List() []string
 }
 
 type defaultStorageIO struct {
@@ -170,6 +171,10 @@ func (sio defaultStorageIO) Delete(sid string) error {
 	panic("not implemented")
 }
 
+func (sio defaultStorageIO) List() []string {
+	panic("not implemented")
+}
+
 func (sio defaultStorageIO) filePath(sid string) string {
 	return filepath.Join(sio.path, sid+"."+sio.ext)
 }
@@ -201,6 +206,19 @@ func (s *storage) GetSession(sid string) (sessionpkg.Session, error) {
 
 func (s *storage) ReapSession(sid string) error {
 	return s.io.Delete(sid)
+}
+
+func (s *storage) Deadline(checker sessionpkg.AgeChecker) {
+	for _, name := range s.io.List() {
+		sess, _ := s.io.Read(name)
+		if sess == nil {
+			continue
+		}
+		if !checker.ShouldReap(sess.ct) {
+			break
+		}
+		s.io.Delete(name)
+	}
 }
 
 func init() {

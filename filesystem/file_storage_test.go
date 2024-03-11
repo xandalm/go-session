@@ -159,6 +159,14 @@ func (sio *stubStorageIO) Delete(sid string) error {
 	return nil
 }
 
+func (sio stubStorageIO) List() []string {
+	names := []string{}
+	for name := range sio.regs {
+		names = append(names, name)
+	}
+	return names
+}
+
 func TestCreatingSessionInStorage(t *testing.T) {
 	t.Run("create session", func(t *testing.T) {
 		io := &stubStorageIO{map[string]*extSession{}}
@@ -241,4 +249,35 @@ func TestReapingSessionFromStorage(t *testing.T) {
 			t.Error("didn't remove session")
 		}
 	})
+}
+
+func TestDeadlineCheckUpInStorage(t *testing.T) {
+	t.Run("remove expired session", func(t *testing.T) {
+
+		regs := map[string]*extSession{}
+		regs["1"] = &extSession{map[string]any{}, time.Now().UnixNano(), time.Now().UnixNano()}
+		regs["2"] = &extSession{map[string]any{}, time.Now().UnixNano(), time.Now().UnixNano()}
+
+		time.Sleep(2 * time.Millisecond)
+
+		regs["3"] = &extSession{map[string]any{}, time.Now().UnixNano(), time.Now().UnixNano()}
+
+		io := &stubStorageIO{regs}
+		storage := &storage{io}
+
+		storage.Deadline(stubMilliAgeChecker(1))
+
+		if len(io.regs) > 1 {
+			t.Fatalf("didn't remove expired session (%d/3)", len(io.regs))
+		}
+		if _, ok := io.regs["3"]; !ok {
+			t.Errorf("session %v must be in the storage", regs["3"])
+		}
+	})
+}
+
+type stubMilliAgeChecker int64
+
+func (c stubMilliAgeChecker) ShouldReap(t time.Time) bool {
+	return time.Now().UnixMilli()-t.UnixMilli() >= int64(c)
 }
