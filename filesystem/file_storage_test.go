@@ -2,7 +2,11 @@ package filesystem
 
 import (
 	"fmt"
+	"log"
+	"os"
+	"path/filepath"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -120,10 +124,12 @@ func TestDeleteValueFromSession(t *testing.T) {
 
 type stubStorageIO struct {
 	regs map[string]*extSession
+	mu   sync.Mutex
 }
 
 func (sio *stubStorageIO) Create(sid string) (*session, error) {
-
+	sio.mu.Lock()
+	defer sio.mu.Unlock()
 	now := time.Now()
 	sess := &session{sid, map[string]any{}, now, now}
 
@@ -137,7 +143,8 @@ func (sio *stubStorageIO) Create(sid string) (*session, error) {
 }
 
 func (sio *stubStorageIO) Read(sid string) (*session, error) {
-
+	sio.mu.Lock()
+	defer sio.mu.Unlock()
 	if reg, ok := sio.regs[sid]; ok {
 		return &session{
 			sid,
@@ -155,11 +162,15 @@ func (sio *stubStorageIO) Write(sess *session) error {
 }
 
 func (sio *stubStorageIO) Delete(sid string) error {
+	sio.mu.Lock()
+	defer sio.mu.Unlock()
 	delete(sio.regs, sid)
 	return nil
 }
 
-func (sio stubStorageIO) List() []string {
+func (sio *stubStorageIO) List() []string {
+	sio.mu.Lock()
+	defer sio.mu.Unlock()
 	names := []string{}
 	for name := range sio.regs {
 		names = append(names, name)
@@ -169,7 +180,7 @@ func (sio stubStorageIO) List() []string {
 
 func TestCreatingSessionInStorage(t *testing.T) {
 	t.Run("create session", func(t *testing.T) {
-		io := &stubStorageIO{map[string]*extSession{}}
+		io := &stubStorageIO{regs: map[string]*extSession{}}
 		storage := &storage{
 			io,
 		}
@@ -200,7 +211,7 @@ func TestGettingSessionFromStorage(t *testing.T) {
 
 		storage := &storage{
 			io: &stubStorageIO{
-				map[string]*extSession{
+				regs: map[string]*extSession{
 					sid: {
 						V:  map[string]any{},
 						Ct: time.Now().UnixNano(),
@@ -231,7 +242,7 @@ func TestReapingSessionFromStorage(t *testing.T) {
 		sid := "abcde"
 
 		io := &stubStorageIO{
-			map[string]*extSession{
+			regs: map[string]*extSession{
 				sid: {
 					V:  map[string]any{},
 					Ct: time.Now().UnixNano(),
@@ -262,13 +273,13 @@ func TestDeadlineCheckUpInStorage(t *testing.T) {
 
 		regs["3"] = &extSession{map[string]any{}, time.Now().UnixNano(), time.Now().UnixNano()}
 
-		io := &stubStorageIO{regs}
+		io := &stubStorageIO{regs: regs}
 		storage := &storage{io}
 
 		storage.Deadline(stubMilliAgeChecker(1))
 
 		if len(io.regs) > 1 {
-			t.Fatalf("didn't remove expired session (%d/3)", len(io.regs))
+			t.Fatalf("didn't remove expired session, has %d from 3", len(io.regs))
 		}
 		if _, ok := io.regs["3"]; !ok {
 			t.Errorf("session %v must be in the storage", regs["3"])
@@ -280,4 +291,47 @@ type stubMilliAgeChecker int64
 
 func (c stubMilliAgeChecker) ShouldReap(t time.Time) bool {
 	return time.Now().UnixMilli()-t.UnixMilli() >= int64(c)
+}
+
+func TestDefaultStorageIO(t *testing.T) {
+	path := ""
+	dir := "sessions"
+	ext := "sess"
+
+	io := newStorageIO(path, dir, ext)
+
+	t.Run("creates session file into the file system", func(t *testing.T) {
+		sid := "abcde"
+		sess, err := io.Create(sid)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, sess)
+
+		if sess.id != sid {
+			t.Fatalf("didn't get session with id=%s, got id=%s", sid, sess.id)
+		}
+
+		file, err := os.Open(filepath.Join(io.path, fmt.Sprintf("%s.%s", sid, ext)))
+		if err != nil {
+			t.Error("cannot open session file (was the file created?)")
+		}
+		file.Close()
+	})
+	t.Run("returns session after read from file system", func(t *testing.T) {
+		sid := "abcde"
+		sess, err := io.Read(sid)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, sess)
+
+		if sess.id != sid {
+			t.Errorf("didn't get session with id=%s, got id=%s", sid, sess.id)
+		}
+	})
+
+	t.Cleanup(func() {
+		if err := os.RemoveAll(io.path); err != nil {
+			log.Fatalf("cannot clean up after test, %v", err)
+		}
+	})
 }
