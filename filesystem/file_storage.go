@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
+	"sync"
 	"time"
 
 	sessionpkg "github.com/xandalm/go-session"
@@ -86,6 +88,7 @@ type storageIO interface {
 type defaultStorageIO struct {
 	path string
 	ext  string
+	mu   sync.Mutex
 }
 
 func newStorageIO(path, dir, ext string) *defaultStorageIO {
@@ -97,18 +100,22 @@ func newStorageIO(path, dir, ext string) *defaultStorageIO {
 			return &defaultStorageIO{
 				path,
 				ext,
+				sync.Mutex{},
 			}
 		}
 	}
 	panic(fmt.Errorf("session: cannot make sessions storage folder, %v", err))
 }
 
-func (sio defaultStorageIO) create(w io.Writer, sess *session) error {
+func (sio *defaultStorageIO) create(w io.Writer, sess *session) error {
 	sess.ct = time.Now()
 	return sio.write(w, sess)
 }
 
-func (sio defaultStorageIO) Create(sid string) (*session, error) {
+func (sio *defaultStorageIO) Create(sid string) (*session, error) {
+	sio.mu.Lock()
+	defer sio.mu.Unlock()
+
 	file, err := os.OpenFile(sio.filePath(sid), os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		return nil, err
@@ -121,7 +128,7 @@ func (sio defaultStorageIO) Create(sid string) (*session, error) {
 	return sess, nil
 }
 
-func (sio defaultStorageIO) read(r io.Reader) (*session, error) {
+func (sio *defaultStorageIO) read(r io.Reader) (*session, error) {
 
 	var esess extSession
 
@@ -139,7 +146,10 @@ func (sio defaultStorageIO) read(r io.Reader) (*session, error) {
 	}, nil
 }
 
-func (sio defaultStorageIO) Read(sid string) (*session, error) {
+func (sio *defaultStorageIO) Read(sid string) (*session, error) {
+	sio.mu.Lock()
+	defer sio.mu.Unlock()
+
 	file, err := os.Open(sio.filePath(sid))
 	if err != nil {
 		return nil, err
@@ -153,7 +163,7 @@ func (sio defaultStorageIO) Read(sid string) (*session, error) {
 	return sess, nil
 }
 
-func (sio defaultStorageIO) write(w io.Writer, sess *session) error {
+func (sio *defaultStorageIO) write(w io.Writer, sess *session) error {
 	enc := gob.NewEncoder(w)
 
 	sess.at = time.Now()
@@ -166,7 +176,10 @@ func (sio defaultStorageIO) write(w io.Writer, sess *session) error {
 	return err
 }
 
-func (sio defaultStorageIO) Write(sess *session) error {
+func (sio *defaultStorageIO) Write(sess *session) error {
+	sio.mu.Lock()
+	defer sio.mu.Unlock()
+
 	file, err := os.OpenFile(sio.filePath(sess.id), os.O_WRONLY, 0666)
 	if err != nil {
 		return err
@@ -179,15 +192,27 @@ func (sio defaultStorageIO) Write(sess *session) error {
 	return sio.write(file, sess)
 }
 
-func (sio defaultStorageIO) Delete(sid string) error {
-	panic("not implemented")
+func (sio *defaultStorageIO) Delete(sid string) error {
+	sio.mu.Lock()
+	defer sio.mu.Unlock()
+
+	return os.Remove(sio.filePath(sid))
 }
 
-func (sio defaultStorageIO) List() []string {
-	panic("not implemented")
+func (sio *defaultStorageIO) List() []string {
+	names := []string{}
+	entries, err := os.ReadDir(sio.path)
+	if err != nil {
+		return nil
+	}
+	for _, entry := range entries {
+		names = append(names, strings.TrimSuffix(entry.Name(), "."+sio.ext))
+	}
+
+	return names
 }
 
-func (sio defaultStorageIO) filePath(sid string) string {
+func (sio *defaultStorageIO) filePath(sid string) string {
 	return filepath.Join(sio.path, sid+"."+sio.ext)
 }
 

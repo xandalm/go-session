@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -277,17 +278,17 @@ func TestDeadlineCheckUpInStorage(t *testing.T) {
 		regs["1"] = &extSession{map[string]any{}, time.Now().UnixNano(), time.Now().UnixNano()}
 		regs["2"] = &extSession{map[string]any{}, time.Now().UnixNano(), time.Now().UnixNano()}
 
-		time.Sleep(2 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 
 		regs["3"] = &extSession{map[string]any{}, time.Now().UnixNano(), time.Now().UnixNano()}
 
 		io := &stubStorageIO{regs: regs}
 		storage := &storage{io}
 
-		storage.Deadline(stubMilliAgeChecker(1))
+		storage.Deadline(stubMilliAgeChecker(10))
 
 		if len(io.regs) > 1 {
-			t.Fatalf("didn't remove expired session, got %d/3", len(io.regs))
+			t.Fatalf("didn't remove expired sessions, got %d/3", len(io.regs))
 		}
 		if _, ok := io.regs["3"]; !ok {
 			t.Errorf("session %v must be in the storage", regs["3"])
@@ -349,6 +350,42 @@ func TestDefaultStorageIO(t *testing.T) {
 
 		if sess.id != got.id || !sess.ct.Equal(got.ct) || !reflect.DeepEqual(sess.v, got.v) {
 			t.Errorf("didn't update session, got %s but want %s", writeSessionToString(got), writeSessionToString(sess))
+		}
+	})
+	t.Run("deletes session from the file system", func(t *testing.T) {
+		sid := "abcde"
+		err := io.Delete(sid)
+
+		assert.NoError(t, err)
+
+		if _, err := os.Open(filepath.Join(io.path, fmt.Sprintf("%s.%s", sid, ext))); err == nil {
+			t.Error("the session file still exists")
+		}
+	})
+	t.Run("list sessions name asc sorted by creation time", func(t *testing.T) {
+
+		sess1, _ := io.Create("abcde")
+		sess2, _ := io.Create("fghij")
+		sess3, _ := io.Create("klmno")
+
+		got := io.List()
+
+		assert.NotNil(t, got)
+
+		if len(got) != 3 {
+			t.Fatal("expected 3 sessions")
+		}
+
+		if !slices.Contains(got, sess1.id) {
+			t.Fatalf("expected %v to contains %q", got, sess1.id)
+		}
+
+		if !slices.Contains(got, sess2.id) {
+			t.Fatalf("expected %v to contains %q", got, sess2.id)
+		}
+
+		if !slices.Contains(got, sess3.id) {
+			t.Errorf("expected %v to contains %q", got, sess3.id)
 		}
 	})
 
