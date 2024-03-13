@@ -169,11 +169,19 @@ func (sio *stubStorageIO) Delete(sid string) error {
 }
 
 func (sio *stubStorageIO) List() []string {
+	names := make([]string, len(sio.regs))
+	var x, y int
 	sio.mu.Lock()
 	defer sio.mu.Unlock()
-	names := []string{}
-	for name := range sio.regs {
-		names = append(names, name)
+	for name, reg := range sio.regs {
+		for x = y - 1; x >= 0; x-- {
+			if reg.Ct >= sio.regs[names[x]].Ct {
+				break
+			}
+			names[x+1] = names[x]
+		}
+		names[x+1] = name
+		y++
 	}
 	return names
 }
@@ -279,7 +287,7 @@ func TestDeadlineCheckUpInStorage(t *testing.T) {
 		storage.Deadline(stubMilliAgeChecker(1))
 
 		if len(io.regs) > 1 {
-			t.Fatalf("didn't remove expired session, has %d from 3", len(io.regs))
+			t.Fatalf("didn't remove expired session, got %d/3", len(io.regs))
 		}
 		if _, ok := io.regs["3"]; !ok {
 			t.Errorf("session %v must be in the storage", regs["3"])
@@ -328,10 +336,29 @@ func TestDefaultStorageIO(t *testing.T) {
 			t.Errorf("didn't get session with id=%s, got id=%s", sid, sess.id)
 		}
 	})
+	t.Run("writes updated session attributes", func(t *testing.T) {
+		sess, _ := io.Read("abcde")
+
+		sess.v["role"] = "test"
+
+		err := io.Write(sess)
+
+		assert.NoError(t, err)
+
+		got, _ := io.Read(sess.id)
+
+		if sess.id != got.id || !sess.ct.Equal(got.ct) || !reflect.DeepEqual(sess.v, got.v) {
+			t.Errorf("didn't update session, got %s but want %s", writeSessionToString(got), writeSessionToString(sess))
+		}
+	})
 
 	t.Cleanup(func() {
 		if err := os.RemoveAll(io.path); err != nil {
 			log.Fatalf("cannot clean up after test, %v", err)
 		}
 	})
+}
+
+func writeSessionToString(sess *session) string {
+	return fmt.Sprintf("{id=%s, creationtime=%s, values=%+v}", sess.id, sess.ct, sess.v)
 }

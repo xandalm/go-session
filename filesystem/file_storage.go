@@ -103,19 +103,9 @@ func newStorageIO(path, dir, ext string) *defaultStorageIO {
 	panic(fmt.Errorf("session: cannot make sessions storage folder, %v", err))
 }
 
-func (s defaultStorageIO) create(w io.Writer, sess *session) error {
-
-	enc := gob.NewEncoder(w)
-
-	now := time.Now()
-	sess.ct = now
-	sess.at = now
-
-	err := enc.Encode(&extSession{
-		Ct: now.UnixNano(),
-		At: now.UnixNano(),
-	})
-	return err
+func (sio defaultStorageIO) create(w io.Writer, sess *session) error {
+	sess.ct = time.Now()
+	return sio.write(w, sess)
 }
 
 func (sio defaultStorageIO) Create(sid string) (*session, error) {
@@ -163,8 +153,30 @@ func (sio defaultStorageIO) Read(sid string) (*session, error) {
 	return sess, nil
 }
 
+func (sio defaultStorageIO) write(w io.Writer, sess *session) error {
+	enc := gob.NewEncoder(w)
+
+	sess.at = time.Now()
+
+	err := enc.Encode(&extSession{
+		Ct: sess.ct.UnixNano(),
+		At: sess.at.UnixNano(),
+		V:  sess.v,
+	})
+	return err
+}
+
 func (sio defaultStorageIO) Write(sess *session) error {
-	panic("not implemented")
+	file, err := os.OpenFile(sio.filePath(sess.id), os.O_WRONLY, 0666)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	_, err = file.Seek(0, 0)
+	if err != nil {
+		return err
+	}
+	return sio.write(file, sess)
 }
 
 func (sio defaultStorageIO) Delete(sid string) error {
