@@ -1,6 +1,7 @@
 package filesystem
 
 import (
+	"container/list"
 	"encoding/gob"
 	"fmt"
 	"io"
@@ -14,16 +15,16 @@ import (
 	sessionpkg "github.com/xandalm/go-session"
 )
 
+type extSession struct {
+	V      map[string]any
+	Ct, At int64
+}
+
 type session struct {
 	id string
 	v  map[string]any
 	ct time.Time
 	at time.Time
-}
-
-type extSession struct {
-	V      map[string]any
-	Ct, At int64
 }
 
 func (s *session) SessionID() string {
@@ -75,6 +76,11 @@ func (s *session) mapped(v reflect.Value) any {
 func (s *session) Delete(key string) error {
 	delete(s.v, key)
 	return nil
+}
+
+type basicSessionInfo struct {
+	id string
+	ct int64
 }
 
 type storageIO interface {
@@ -199,17 +205,16 @@ func (sio *defaultStorageIO) Delete(sid string) error {
 	return os.Remove(sio.filePath(sid))
 }
 
-func (sio *defaultStorageIO) List() []string {
-	names := []string{}
+func (sio *defaultStorageIO) List() (names []string) {
 	entries, err := os.ReadDir(sio.path)
 	if err != nil {
-		return nil
+		return
 	}
+	names = []string{}
 	for _, entry := range entries {
 		names = append(names, strings.TrimSuffix(entry.Name(), "."+sio.ext))
 	}
-
-	return names
+	return
 }
 
 func (sio *defaultStorageIO) filePath(sid string) string {
@@ -217,12 +222,49 @@ func (sio *defaultStorageIO) filePath(sid string) string {
 }
 
 type storage struct {
-	io storageIO
+	io   storageIO
+	m    map[string]*list.Element
+	list *list.List
 }
 
-func NewStorage(path, dir, ext string) *storage {
-	io := newStorageIO(path, dir, ext)
-	return &storage{io}
+func newStorage(path, dir, ext string) *storage {
+	s := &storage{
+		io:   newStorageIO(path, dir, ext),
+		m:    map[string]*list.Element{},
+		list: list.New(),
+	}
+
+	names := s.io.List()
+	if names == nil {
+		panic("session: cannot list sessions files")
+	}
+
+	// load sessions from file system
+	var hold *list.Element
+	for _, name := range names {
+		sess, err := s.io.Read(name)
+		if err != nil {
+			panic("session: cannot load sessions files")
+		}
+		bsi := &basicSessionInfo{
+			sess.id,
+			sess.ct.UnixNano(),
+		}
+		for hold = s.list.Back(); hold != nil; hold = hold.Prev() {
+			hbsi := hold.Value.(*basicSessionInfo)
+			if bsi.ct >= hbsi.ct {
+				break
+			}
+			s.m[hbsi.id] = s.list.InsertAfter(hold.Value, hold)
+		}
+		if hold == nil {
+			s.m[bsi.id] = s.list.PushBack(bsi)
+		} else {
+			hold.Value = bsi
+			s.m[bsi.id] = hold
+		}
+	}
+	return s
 }
 
 func (s *storage) CreateSession(sid string) (sessionpkg.Session, error) {
@@ -230,6 +272,10 @@ func (s *storage) CreateSession(sid string) (sessionpkg.Session, error) {
 	if err != nil {
 		return nil, err
 	}
+	s.m[sid] = s.list.PushBack(&basicSessionInfo{
+		sess.id,
+		sess.ct.UnixNano(),
+	})
 	return sess, nil
 }
 

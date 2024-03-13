@@ -1,6 +1,7 @@
 package filesystem
 
 import (
+	"container/list"
 	"fmt"
 	"log"
 	"os"
@@ -187,11 +188,16 @@ func (sio *stubStorageIO) List() []string {
 	return names
 }
 
+var dummyMap = map[string]*list.Element{}
+var dummyList = list.New()
+
 func TestCreatingSessionInStorage(t *testing.T) {
 	t.Run("create session", func(t *testing.T) {
 		io := &stubStorageIO{regs: map[string]*extSession{}}
 		storage := &storage{
 			io,
+			dummyMap,
+			dummyList,
 		}
 
 		sid := "abcde"
@@ -259,7 +265,7 @@ func TestReapingSessionFromStorage(t *testing.T) {
 				},
 			},
 		}
-		storage := &storage{io}
+		storage := &storage{io, dummyMap, dummyList}
 
 		err := storage.ReapSession(sid)
 
@@ -283,7 +289,7 @@ func TestDeadlineCheckUpInStorage(t *testing.T) {
 		regs["3"] = &extSession{map[string]any{}, time.Now().UnixNano(), time.Now().UnixNano()}
 
 		io := &stubStorageIO{regs: regs}
-		storage := &storage{io}
+		storage := &storage{io, dummyMap, dummyList}
 
 		storage.Deadline(stubMilliAgeChecker(10))
 
