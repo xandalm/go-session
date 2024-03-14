@@ -94,7 +94,6 @@ type storageIO interface {
 type defaultStorageIO struct {
 	path string
 	ext  string
-	mu   sync.Mutex
 }
 
 func newStorageIO(path, dir, ext string) *defaultStorageIO {
@@ -106,7 +105,6 @@ func newStorageIO(path, dir, ext string) *defaultStorageIO {
 			return &defaultStorageIO{
 				path,
 				ext,
-				sync.Mutex{},
 			}
 		}
 	}
@@ -119,9 +117,6 @@ func (sio *defaultStorageIO) create(w io.Writer, sess *session) error {
 }
 
 func (sio *defaultStorageIO) Create(sid string) (*session, error) {
-	sio.mu.Lock()
-	defer sio.mu.Unlock()
-
 	file, err := os.OpenFile(sio.filePath(sid), os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		return nil, err
@@ -153,9 +148,6 @@ func (sio *defaultStorageIO) read(r io.Reader) (*session, error) {
 }
 
 func (sio *defaultStorageIO) Read(sid string) (*session, error) {
-	sio.mu.Lock()
-	defer sio.mu.Unlock()
-
 	file, err := os.Open(sio.filePath(sid))
 	if err != nil {
 		return nil, err
@@ -183,9 +175,6 @@ func (sio *defaultStorageIO) write(w io.Writer, sess *session) error {
 }
 
 func (sio *defaultStorageIO) Write(sess *session) error {
-	sio.mu.Lock()
-	defer sio.mu.Unlock()
-
 	file, err := os.OpenFile(sio.filePath(sess.id), os.O_WRONLY, 0666)
 	if err != nil {
 		return err
@@ -199,9 +188,6 @@ func (sio *defaultStorageIO) Write(sess *session) error {
 }
 
 func (sio *defaultStorageIO) Delete(sid string) error {
-	sio.mu.Lock()
-	defer sio.mu.Unlock()
-
 	return os.Remove(sio.filePath(sid))
 }
 
@@ -225,6 +211,7 @@ type storage struct {
 	io   storageIO
 	m    map[string]*list.Element
 	list *list.List
+	mu   sync.Mutex
 }
 
 func newStorage(path, dir, ext string) *storage {
@@ -232,6 +219,7 @@ func newStorage(path, dir, ext string) *storage {
 		io:   newStorageIO(path, dir, ext),
 		m:    map[string]*list.Element{},
 		list: list.New(),
+		mu:   sync.Mutex{},
 	}
 
 	names := s.io.List()
@@ -268,6 +256,9 @@ func newStorage(path, dir, ext string) *storage {
 }
 
 func (s *storage) CreateSession(sid string) (sessionpkg.Session, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	sess, err := s.io.Create(sid)
 	if err != nil {
 		return nil, err
@@ -280,6 +271,9 @@ func (s *storage) CreateSession(sid string) (sessionpkg.Session, error) {
 }
 
 func (s *storage) GetSession(sid string) (sessionpkg.Session, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if _, ok := s.m[sid]; ok {
 		sess, err := s.io.Read(sid)
 		if err != nil {
@@ -291,6 +285,9 @@ func (s *storage) GetSession(sid string) (sessionpkg.Session, error) {
 }
 
 func (s *storage) ReapSession(sid string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if elem, ok := s.m[sid]; ok {
 		if err := s.io.Delete(sid); err != nil {
 			return err
@@ -302,6 +299,9 @@ func (s *storage) ReapSession(sid string) error {
 }
 
 func (s *storage) Deadline(checker sessionpkg.AgeChecker) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	for {
 		elem := s.list.Front()
 		if elem == nil {

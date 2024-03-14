@@ -198,6 +198,7 @@ func TestCreatingSessionInStorage(t *testing.T) {
 			io,
 			dummyMap,
 			dummyList,
+			sync.Mutex{},
 		}
 
 		sid := "abcde"
@@ -270,7 +271,7 @@ func TestReapingSessionFromStorage(t *testing.T) {
 				},
 			},
 		}
-		storage := &storage{io, dummyMap, dummyList}
+		storage := &storage{io, dummyMap, dummyList, sync.Mutex{}}
 
 		err := storage.ReapSession(sid)
 
@@ -298,7 +299,7 @@ func TestDeadlineCheckUpInStorage(t *testing.T) {
 
 		io := &stubStorageIO{regs: regs}
 		m, l := createSessionsMapAndList(sess1, sess2, sess3)
-		storage := &storage{io, m, l}
+		storage := &storage{io, m, l, sync.Mutex{}}
 
 		storage.Deadline(stubMilliAgeChecker(10))
 
