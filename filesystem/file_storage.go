@@ -280,27 +280,41 @@ func (s *storage) CreateSession(sid string) (sessionpkg.Session, error) {
 }
 
 func (s *storage) GetSession(sid string) (sessionpkg.Session, error) {
-	sess, err := s.io.Read(sid)
-	if err != nil {
-		return nil, err
+	if _, ok := s.m[sid]; ok {
+		sess, err := s.io.Read(sid)
+		if err != nil {
+			return nil, err
+		}
+		return sess, nil
 	}
-	return sess, nil
+	return nil, nil
 }
 
 func (s *storage) ReapSession(sid string) error {
-	return s.io.Delete(sid)
+	if elem, ok := s.m[sid]; ok {
+		if err := s.io.Delete(sid); err != nil {
+			return err
+		}
+		s.list.Remove(elem)
+		delete(s.m, sid)
+	}
+	return nil
 }
 
 func (s *storage) Deadline(checker sessionpkg.AgeChecker) {
-	for _, name := range s.io.List() {
-		sess, _ := s.io.Read(name)
-		if sess == nil {
-			continue
-		}
-		if !checker.ShouldReap(sess.ct) {
+	for {
+		elem := s.list.Front()
+		if elem == nil {
 			break
 		}
-		s.io.Delete(name)
+		bsi := elem.Value.(*basicSessionInfo)
+		if !checker.ShouldReap(time.Unix(0, bsi.ct)) {
+			break
+		}
+		if err := s.io.Delete(bsi.id); err == nil {
+			s.list.Remove(elem)
+			delete(s.m, bsi.id)
+		}
 	}
 }
 

@@ -224,16 +224,21 @@ func TestGettingSessionFromStorage(t *testing.T) {
 
 		sid := "abcde"
 
+		sess := &session{
+			sid,
+			map[string]any{},
+			time.Now(),
+			time.Now(),
+		}
+		m, l := createSessionsMapAndList(sess)
 		storage := &storage{
 			io: &stubStorageIO{
 				regs: map[string]*extSession{
-					sid: {
-						V:  map[string]any{},
-						Ct: time.Now().UnixNano(),
-						At: time.Now().UnixNano(),
-					},
+					sid: createExtSessionFromSession(sess),
 				},
 			},
+			m:    m,
+			list: l,
 		}
 
 		got, err := storage.GetSession(sid)
@@ -281,15 +286,19 @@ func TestDeadlineCheckUpInStorage(t *testing.T) {
 	t.Run("remove expired session", func(t *testing.T) {
 
 		regs := map[string]*extSession{}
-		regs["1"] = &extSession{map[string]any{}, time.Now().UnixNano(), time.Now().UnixNano()}
-		regs["2"] = &extSession{map[string]any{}, time.Now().UnixNano(), time.Now().UnixNano()}
+		sess1 := &session{"1", map[string]any{}, time.Now(), time.Now()}
+		regs[sess1.id] = createExtSessionFromSession(sess1)
+		sess2 := &session{"2", map[string]any{}, time.Now(), time.Now()}
+		regs[sess2.id] = createExtSessionFromSession(sess2)
 
 		time.Sleep(10 * time.Millisecond)
 
-		regs["3"] = &extSession{map[string]any{}, time.Now().UnixNano(), time.Now().UnixNano()}
+		sess3 := &session{"3", map[string]any{}, time.Now(), time.Now()}
+		regs[sess3.id] = createExtSessionFromSession(sess3)
 
 		io := &stubStorageIO{regs: regs}
-		storage := &storage{io, dummyMap, dummyList}
+		m, l := createSessionsMapAndList(sess1, sess2, sess3)
+		storage := &storage{io, m, l}
 
 		storage.Deadline(stubMilliAgeChecker(10))
 
@@ -300,6 +309,26 @@ func TestDeadlineCheckUpInStorage(t *testing.T) {
 			t.Errorf("session %v must be in the storage", regs["3"])
 		}
 	})
+}
+
+func createExtSessionFromSession(v *session) *extSession {
+	return &extSession{
+		v.v,
+		v.ct.UnixNano(),
+		v.at.UnixNano(),
+	}
+}
+
+func createSessionsMapAndList(v ...*session) (m map[string]*list.Element, l *list.List) {
+	m = map[string]*list.Element{}
+	l = list.New()
+	for _, s := range v {
+		m[s.id] = l.PushBack(&basicSessionInfo{
+			s.id,
+			s.ct.UnixNano(),
+		})
+	}
+	return
 }
 
 type stubMilliAgeChecker int64
