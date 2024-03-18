@@ -56,11 +56,23 @@ func TestGetValueFromSession(t *testing.T) {
 }
 
 func TestSetValueFromSession(t *testing.T) {
+
 	sess := &session{
 		id: "abcde",
 		v:  map[string]any{},
 		ct: time.Now(),
 	}
+	io := &stubStorageIO{regs: map[string]*extSession{
+		sess.id: {
+			sess.v,
+			sess.ct.UnixNano(),
+			sess.at.UnixNano(),
+		},
+	}}
+	Storage.io = io
+	t.Cleanup(func() {
+		Storage.io = defaultIO
+	})
 
 	cases := []struct {
 		typ   string
@@ -82,6 +94,13 @@ func TestSetValueFromSession(t *testing.T) {
 			if got, ok := sess.v["foo"]; ok {
 				if !reflect.DeepEqual(got, c.want) {
 					t.Errorf("set value to %v, but want %v", got, c.want)
+				}
+				got, ok := io.regs[sess.id].V["foo"]
+				if !ok {
+					t.Error("didn't update storage")
+				}
+				if !reflect.DeepEqual(got, c.want) {
+					t.Errorf("storage is updated to wrong value, got %v want %v", got, c.want)
 				}
 				return
 			}
@@ -109,12 +128,24 @@ func TestSetValueFromSession(t *testing.T) {
 }
 
 func TestDeleteValueFromSession(t *testing.T) {
+
 	sess := &session{
 		id: "abcde",
 		v:  map[string]any{"key": 123},
 		ct: time.Now(),
+		at: time.Now(),
 	}
-
+	io := &stubStorageIO{regs: map[string]*extSession{
+		sess.id: {
+			sess.v,
+			sess.ct.UnixNano(),
+			sess.at.UnixNano(),
+		},
+	}}
+	Storage.io = io
+	t.Cleanup(func() {
+		Storage.io = defaultIO
+	})
 	err := sess.Delete("key")
 
 	assert.NoError(t, err)
@@ -122,16 +153,16 @@ func TestDeleteValueFromSession(t *testing.T) {
 	if _, ok := sess.v["key"]; ok {
 		t.Error("didn't delete value")
 	}
+	if _, ok := io.regs[sess.id].V["key"]; ok {
+		t.Error("didn't update storage, value still exists")
+	}
 }
 
 type stubStorageIO struct {
 	regs map[string]*extSession
-	mu   sync.Mutex
 }
 
 func (sio *stubStorageIO) Create(sid string) (*session, error) {
-	sio.mu.Lock()
-	defer sio.mu.Unlock()
 	now := time.Now()
 	sess := &session{sid, map[string]any{}, now, now}
 
@@ -145,8 +176,6 @@ func (sio *stubStorageIO) Create(sid string) (*session, error) {
 }
 
 func (sio *stubStorageIO) Read(sid string) (*session, error) {
-	sio.mu.Lock()
-	defer sio.mu.Unlock()
 	if reg, ok := sio.regs[sid]; ok {
 		return &session{
 			sid,
@@ -160,12 +189,14 @@ func (sio *stubStorageIO) Read(sid string) (*session, error) {
 }
 
 func (sio *stubStorageIO) Write(sess *session) error {
+	esess := sio.regs[sess.id]
+	esess.At = time.Now().UnixNano()
+	esess.V = sess.v
+	sio.regs[sess.id] = esess
 	return nil
 }
 
 func (sio *stubStorageIO) Delete(sid string) error {
-	sio.mu.Lock()
-	defer sio.mu.Unlock()
 	delete(sio.regs, sid)
 	return nil
 }
@@ -173,8 +204,6 @@ func (sio *stubStorageIO) Delete(sid string) error {
 func (sio *stubStorageIO) List() []string {
 	names := make([]string, len(sio.regs))
 	var x, y int
-	sio.mu.Lock()
-	defer sio.mu.Unlock()
 	for name, reg := range sio.regs {
 		for x = y - 1; x >= 0; x-- {
 			if reg.Ct >= sio.regs[names[x]].Ct {
@@ -340,7 +369,7 @@ func (c stubMilliAgeChecker) ShouldReap(t time.Time) bool {
 
 func TestDefaultStorageIO(t *testing.T) {
 	path := ""
-	dir := "sessions"
+	dir := "sessions_test"
 	ext := "sess"
 
 	io := newStorageIO(path, dir, ext)

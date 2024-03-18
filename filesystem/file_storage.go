@@ -41,6 +41,9 @@ func (s *session) Set(key string, value any) error {
 		rValue = reflect.Indirect(rValue)
 	}
 	s.v[key] = s.mapped(rValue)
+	if err := Storage.update(s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -75,6 +78,9 @@ func (s *session) mapped(v reflect.Value) any {
 
 func (s *session) Delete(key string) error {
 	delete(s.v, key)
+	if err := Storage.update(s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -214,9 +220,9 @@ type storage struct {
 	mu   sync.Mutex
 }
 
-func newStorage(path, dir, ext string) *storage {
+func newStorage(io storageIO) *storage {
 	s := &storage{
-		io:   newStorageIO(path, dir, ext),
+		io:   io,
 		m:    map[string]*list.Element{},
 		list: list.New(),
 		mu:   sync.Mutex{},
@@ -317,6 +323,19 @@ func (s *storage) Deadline(checker sessionpkg.AgeChecker) {
 		}
 	}
 }
+
+func (s *storage) update(sess *session) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.io.Write(sess); err != nil {
+		return err
+	}
+	return nil
+}
+
+var defaultIO = newStorageIO("", "sessions", "sess")
+var Storage = newStorage(defaultIO)
 
 func init() {
 	gob.Register(map[string]any{})
