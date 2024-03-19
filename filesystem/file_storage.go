@@ -50,9 +50,9 @@ func (s *session) Set(key string, value any) error {
 func (s *session) mapped(v reflect.Value) any {
 	switch v.Kind() {
 	case reflect.Func:
-		panic("session: cannot stores func into session")
+		panic("filesystem: cannot stores func into session")
 	case reflect.Chan:
-		panic("session: cannot stores chan into session")
+		panic("filesystem: cannot stores chan into session")
 	case reflect.Struct:
 		vFields := reflect.VisibleFields(v.Type())
 		m := map[string]any{}
@@ -113,7 +113,7 @@ func newStorageIO(path string) *defaultStorageIO {
 			}
 		}
 	}
-	panic(fmt.Errorf("session: cannot make sessions storage folder, %v", err))
+	panic(fmt.Sprintf("filesystem: cannot make sessions storage folder, %v", err))
 }
 
 func (sio *defaultStorageIO) create(w io.Writer, sess *session) error {
@@ -229,7 +229,7 @@ func newStorage(io storageIO) *storage {
 
 	names := s.io.List()
 	if names == nil {
-		panic("session: cannot list sessions files")
+		panic("filesystem: cannot list sessions files")
 	}
 
 	// load sessions from file system
@@ -237,7 +237,7 @@ func newStorage(io storageIO) *storage {
 	for _, name := range names {
 		sess, err := s.io.Read(name)
 		if err != nil {
-			panic("session: cannot load sessions files")
+			panic("filesystem: cannot load sessions files")
 		}
 		bsi := &basicSessionInfo{
 			sess.id,
@@ -344,16 +344,13 @@ func (s *storage) setIO(io storageIO) {
 var _io = newStorageIO(filepath.Join(os.TempDir(), "gosessions"))
 var _storage = newStorage(_io)
 
-func Storage(args ...any) *storage {
+func Storage(args ...string) *storage {
 	if len(args) == 0 {
 		return _storage
 	}
-	path, ok := args[0].(string)
-	if !ok {
-		panic("invalid argument, must be string")
-	}
+	path := args[0]
 	if _, err := filepath.Abs(path); err != nil {
-		panic(err)
+		panic("filesystem: argument is not a valid path")
 	}
 	_storage.mu.Lock()
 	defer _storage.mu.Unlock()
