@@ -11,9 +11,13 @@ import (
 )
 
 type Session interface {
+	// Defines a value for the key.
 	Set(key string, value any) error
+	// Returns a value for the key, or nil if it doesn't exist.
 	Get(key string) any
+	// Removes the key and it's value.
 	Delete(key string) error
+	// Returns session identifier.
 	SessionID() string
 }
 

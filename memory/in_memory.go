@@ -53,6 +53,7 @@ func newStorage() *storage {
 	}
 }
 
+// Returns a session or an error if cannot creates a session into the storage.
 func (s *storage) CreateSession(sid string) (sessionpkg.Session, error) {
 	if sid == "" {
 		panic("empty sid")
@@ -72,6 +73,7 @@ func (s *storage) insertSession(sess *session) error {
 	return nil
 }
 
+// Returns a session or an error if cannot reads the session from the storage.
 func (s *storage) GetSession(sid string) (sessionpkg.Session, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -82,6 +84,7 @@ func (s *storage) GetSession(sid string) (sessionpkg.Session, error) {
 	return nil, nil
 }
 
+// Checks if the storage contains the session.
 func (s *storage) ContainsSession(sid string) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -89,6 +92,7 @@ func (s *storage) ContainsSession(sid string) (bool, error) {
 	return ok, nil
 }
 
+// Destroys the session from the storage.
 func (s *storage) ReapSession(sid string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -99,6 +103,7 @@ func (s *storage) ReapSession(sid string) error {
 	return nil
 }
 
+// Scans the storage removing expired sessions.
 func (s *storage) Deadline(checker sessionpkg.AgeChecker) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -116,6 +121,7 @@ func (s *storage) Deadline(checker sessionpkg.AgeChecker) {
 
 var _storage = newStorage()
 
+// Returns the storage.
 func Storage() *storage {
 	return _storage
 }
