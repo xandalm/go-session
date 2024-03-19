@@ -1,6 +1,8 @@
 package filesystem_test
 
 import (
+	"log"
+	"os"
 	"testing"
 	"time"
 
@@ -10,9 +12,9 @@ import (
 )
 
 func TestSessionLifecycleAtStorage(t *testing.T) {
-
-	storage := filesystem.Storage
-	sid := "session_test_01"
+	path := "sessions_from_acceptance_test"
+	storage := filesystem.Storage(path)
+	sid := "a63140d2bb051e439c790a4d35c0"
 
 	t.Run("create session", func(t *testing.T) {
 		sess, err := storage.CreateSession(sid)
@@ -85,5 +87,10 @@ func TestSessionLifecycleAtStorage(t *testing.T) {
 		sess, err = storage.GetSession(sess.SessionID())
 		assert.NoError(t, err)
 		assert.Nil(t, sess, "didn't remove expired session")
+	})
+	t.Cleanup(func() {
+		if err := os.RemoveAll(path); err != nil {
+			log.Fatalf("cannot clean up after test, %v", err)
+		}
 	})
 }

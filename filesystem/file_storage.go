@@ -41,7 +41,7 @@ func (s *session) Set(key string, value any) error {
 		rValue = reflect.Indirect(rValue)
 	}
 	s.v[key] = s.mapped(rValue)
-	if err := Storage.update(s); err != nil {
+	if err := _storage.update(s); err != nil {
 		return err
 	}
 	return nil
@@ -78,7 +78,7 @@ func (s *session) mapped(v reflect.Value) any {
 
 func (s *session) Delete(key string) error {
 	delete(s.v, key)
-	if err := Storage.update(s); err != nil {
+	if err := _storage.update(s); err != nil {
 		return err
 	}
 	return nil
@@ -98,19 +98,18 @@ type storageIO interface {
 }
 
 type defaultStorageIO struct {
-	path string
-	ext  string
+	path   string
+	prefix string
 }
 
-func newStorageIO(path, dir, ext string) *defaultStorageIO {
+func newStorageIO(path string) *defaultStorageIO {
 	path, err := filepath.Abs(path)
 	if err == nil {
-		path = filepath.Join(path, dir)
 		err = os.MkdirAll(path, 0750)
 		if err == nil || os.IsExist(err) {
 			return &defaultStorageIO{
 				path,
-				ext,
+				"gosess_",
 			}
 		}
 	}
@@ -204,13 +203,13 @@ func (sio *defaultStorageIO) List() (names []string) {
 	}
 	names = []string{}
 	for _, entry := range entries {
-		names = append(names, strings.TrimSuffix(entry.Name(), "."+sio.ext))
+		names = append(names, strings.TrimPrefix(entry.Name(), sio.prefix))
 	}
 	return
 }
 
 func (sio *defaultStorageIO) filePath(sid string) string {
-	return filepath.Join(sio.path, sid+"."+sio.ext)
+	return filepath.Join(sio.path, sio.prefix+sid)
 }
 
 type storage struct {
@@ -334,8 +333,33 @@ func (s *storage) update(sess *session) error {
 	return nil
 }
 
-var defaultIO = newStorageIO("", "sessions", "sess")
-var Storage = newStorage(defaultIO)
+func (s *storage) setIO(io storageIO) {
+	s.m = map[string]*list.Element{}
+	s.list.Init()
+	s.io = io
+}
+
+var _io = newStorageIO(filepath.Join(os.TempDir(), "gosessions"))
+var _storage = newStorage(_io)
+
+func Storage(args ...any) *storage {
+	if len(args) == 0 {
+		return _storage
+	}
+	path, ok := args[0].(string)
+	if !ok {
+		panic("invalid argument, must be string")
+	}
+	if _, err := filepath.Abs(path); err != nil {
+		panic(err)
+	}
+	_storage.mu.Lock()
+	defer _storage.mu.Unlock()
+
+	_storage.setIO(newStorageIO(path))
+
+	return _storage
+}
 
 func init() {
 	gob.Register(map[string]any{})

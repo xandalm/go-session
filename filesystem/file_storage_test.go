@@ -69,9 +69,9 @@ func TestSetValueFromSession(t *testing.T) {
 			sess.at.UnixNano(),
 		},
 	}}
-	Storage.io = io
+	_storage.io = io
 	t.Cleanup(func() {
-		Storage.io = defaultIO
+		_storage.io = _io // default io
 	})
 
 	cases := []struct {
@@ -142,9 +142,9 @@ func TestDeleteValueFromSession(t *testing.T) {
 			sess.at.UnixNano(),
 		},
 	}}
-	Storage.io = io
+	_storage.io = io
 	t.Cleanup(func() {
-		Storage.io = defaultIO
+		_storage.io = _io // default io
 	})
 	err := sess.Delete("key")
 
@@ -291,16 +291,23 @@ func TestReapingSessionFromStorage(t *testing.T) {
 
 		sid := "abcde"
 
+		sess := &session{
+			sid,
+			map[string]any{},
+			time.Now(),
+			time.Now(),
+		}
+		m, l := createSessionsMapAndList(sess)
 		io := &stubStorageIO{
 			regs: map[string]*extSession{
-				sid: {
-					V:  map[string]any{},
-					Ct: time.Now().UnixNano(),
-					At: time.Now().UnixNano(),
-				},
+				sid: createExtSessionFromSession(sess),
 			},
 		}
-		storage := &storage{io, dummyMap, dummyList, sync.Mutex{}}
+		storage := &storage{
+			io:   io,
+			m:    m,
+			list: l,
+		}
 
 		err := storage.ReapSession(sid)
 
@@ -368,11 +375,9 @@ func (c stubMilliAgeChecker) ShouldReap(t time.Time) bool {
 }
 
 func TestDefaultStorageIO(t *testing.T) {
-	path := ""
-	dir := "sessions_test"
-	ext := "sess"
+	path := "sessions_from_test"
 
-	io := newStorageIO(path, dir, ext)
+	io := newStorageIO(path)
 
 	t.Run("creates session file into the file system", func(t *testing.T) {
 		sid := "abcde"
@@ -385,7 +390,7 @@ func TestDefaultStorageIO(t *testing.T) {
 			t.Fatalf("didn't get session with id=%s, got id=%s", sid, sess.id)
 		}
 
-		file, err := os.Open(filepath.Join(io.path, fmt.Sprintf("%s.%s", sid, ext)))
+		file, err := os.Open(filepath.Join(io.path, fmt.Sprintf("%s%s", io.prefix, sid)))
 		if err != nil {
 			t.Error("cannot open session file (was the file created?)")
 		}
@@ -423,7 +428,7 @@ func TestDefaultStorageIO(t *testing.T) {
 
 		assert.NoError(t, err)
 
-		if _, err := os.Open(filepath.Join(io.path, fmt.Sprintf("%s.%s", sid, ext))); err == nil {
+		if _, err := os.Open(filepath.Join(io.path, fmt.Sprintf("%s%s", io.prefix, sid))); err == nil {
 			t.Error("the session file still exists")
 		}
 	})

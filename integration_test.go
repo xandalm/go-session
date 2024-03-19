@@ -2,15 +2,18 @@ package session_test
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/xandalm/go-session"
+	"github.com/xandalm/go-session/filesystem"
 	"github.com/xandalm/go-session/memory"
 )
 
@@ -190,9 +193,8 @@ func (m *stubCookieManager) WriteCookies(r *http.Request) {
 	m.cookies = keep
 }
 
-func TestSessionsWithMemoryStorage(t *testing.T) {
-	provider := session.NewDefaultProvider(memory.Storage, session.SecondsAgeCheckerAdapter)
-	manager := session.NewManager(provider, "SESSION_ID", 1)
+func performTest(t *testing.T, manager *session.Manager) {
+	t.Helper()
 
 	server := newServer(manager)
 
@@ -347,4 +349,25 @@ func getCookieFromResponse(res *httptest.ResponseRecorder) (cookie map[string]st
 	}
 
 	return
+}
+
+func TestSessionsWithMemoryStorage(t *testing.T) {
+	provider := session.NewDefaultProvider(memory.Storage, session.SecondsAgeCheckerAdapter)
+	manager := session.NewManager(provider, "SESSION_ID", 1)
+
+	performTest(t, manager)
+}
+
+func TestSessionsWithFileSystemStorage(t *testing.T) {
+	path := "sessions_from_integration_test"
+	provider := session.NewDefaultProvider(filesystem.Storage(path), session.SecondsAgeCheckerAdapter)
+	manager := session.NewManager(provider, "SESSION_ID", 1)
+
+	performTest(t, manager)
+
+	t.Cleanup(func() {
+		if err := os.RemoveAll(path); err != nil {
+			log.Fatalf("cannot clean up after test, %v", err)
+		}
+	})
 }
