@@ -352,7 +352,7 @@ func getCookieFromResponse(res *httptest.ResponseRecorder) (cookie map[string]st
 }
 
 func TestSessionsWithMemoryStorage(t *testing.T) {
-	provider := session.NewDefaultProvider(memory.Storage(), session.SecondsAgeCheckerAdapter)
+	provider := session.NewProvider(memory.Storage(), session.SecondsAgeCheckerAdapter)
 	manager := session.NewManager(provider, "SESSION_ID", 1)
 
 	performTest(t, manager)
@@ -360,7 +360,7 @@ func TestSessionsWithMemoryStorage(t *testing.T) {
 
 func TestSessionsWithFileSystemStorage(t *testing.T) {
 	path := "sessions_from_integration_test"
-	provider := session.NewDefaultProvider(filesystem.Storage(path), session.SecondsAgeCheckerAdapter)
+	provider := session.NewProvider(filesystem.Storage(path), session.SecondsAgeCheckerAdapter)
 	manager := session.NewManager(provider, "SESSION_ID", 1)
 
 	performTest(t, manager)

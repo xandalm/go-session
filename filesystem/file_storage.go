@@ -289,6 +289,14 @@ func (s *storage) GetSession(sid string) (sessionpkg.Session, error) {
 	return nil, nil
 }
 
+func (s *storage) ContainsSession(sid string) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_, ok := s.m[sid]
+	return ok, nil
+}
+
 func (s *storage) ReapSession(sid string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

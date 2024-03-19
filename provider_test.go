@@ -15,19 +15,19 @@ func TestSessionInit(t *testing.T) {
 	t.Run("tell storage to create session", func(t *testing.T) {
 		sessionStorage := &spySessionStorage{}
 
-		provider := &DefaultProvider{sessionStorage, dummyAdapter}
+		provider := &defaultProvider{sessionStorage, dummyAdapter}
 
 		_, err := provider.SessionInit("1")
 		assert.NoError(t, err)
 
-		if sessionStorage.callsToGetSession == 0 {
+		if sessionStorage.callsToCreateSession == 0 {
 			t.Error("didn't tell storage")
 		}
 	})
 
 	sessionStorage := newStubSessionStorage()
 
-	provider := &DefaultProvider{sessionStorage, dummyAdapter}
+	provider := &defaultProvider{sessionStorage, dummyAdapter}
 	t.Run("init the session", func(t *testing.T) {
 
 		sid := "17af454"
@@ -49,7 +49,7 @@ func TestSessionInit(t *testing.T) {
 	t.Run("returns error for duplicated sid", func(t *testing.T) {
 		_, err := provider.SessionInit("17af454")
 
-		assert.Error(t, err, ErrDuplicateSessionId)
+		assert.Error(t, err, ErrDuplicatedSessionId)
 	})
 	t.Run("returns error for inability to ensure non-duplicity", func(t *testing.T) {
 		sessionStorage := &stubFailingSessionStorage{
@@ -59,7 +59,7 @@ func TestSessionInit(t *testing.T) {
 				},
 			},
 		}
-		provider := &DefaultProvider{sessionStorage, dummyAdapter}
+		provider := &defaultProvider{sessionStorage, dummyAdapter}
 
 		_, err := provider.SessionInit("17af454")
 
@@ -67,11 +67,12 @@ func TestSessionInit(t *testing.T) {
 	})
 	t.Run("returns error for storage create failure", func(t *testing.T) {
 		sessionStorage := &mockSessionStorage{
-			Sessions:          map[string]Session{},
-			CreateSessionFunc: func(sid string) (Session, error) { return nil, errFoo },
-			GetSessionFunc:    func(sid string) (Session, error) { return nil, nil },
+			Sessions:            map[string]Session{},
+			CreateSessionFunc:   func(sid string) (Session, error) { return nil, errFoo },
+			GetSessionFunc:      func(sid string) (Session, error) { return nil, nil },
+			ContainsSessionFunc: func(sid string) (bool, error) { return false, nil },
 		}
-		provider := &DefaultProvider{sessionStorage, dummyAdapter}
+		provider := &defaultProvider{sessionStorage, dummyAdapter}
 
 		_, err := provider.SessionInit("17af450")
 
@@ -84,7 +85,7 @@ func TestSessionRead(t *testing.T) {
 	t.Run("tell storage to get session", func(t *testing.T) {
 		sessionStorage := &spySessionStorage{}
 
-		provider := &DefaultProvider{sessionStorage, dummyAdapter}
+		provider := &defaultProvider{sessionStorage, dummyAdapter}
 
 		_, err := provider.SessionRead("1")
 		assert.NoError(t, err)
@@ -102,7 +103,7 @@ func TestSessionRead(t *testing.T) {
 		},
 	}
 
-	provider := &DefaultProvider{sessionStorage, dummyAdapter}
+	provider := &defaultProvider{sessionStorage, dummyAdapter}
 
 	t.Run("returns session", func(t *testing.T) {
 		sid := "17af454"
@@ -128,7 +129,7 @@ func TestSessionRead(t *testing.T) {
 	})
 	t.Run("returns error on failing session restoration", func(t *testing.T) {
 		sessionStorage := &stubFailingSessionStorage{}
-		provider := &DefaultProvider{sessionStorage, dummyAdapter}
+		provider := &defaultProvider{sessionStorage, dummyAdapter}
 
 		_, err := provider.SessionRead("17af454")
 
@@ -146,7 +147,7 @@ func TestSessionDestroy(t *testing.T) {
 		},
 	}
 
-	provider := &DefaultProvider{sessionStorage, dummyAdapter}
+	provider := &defaultProvider{sessionStorage, dummyAdapter}
 
 	t.Run("destroys session", func(t *testing.T) {
 		sid := "17af454"
@@ -160,7 +161,7 @@ func TestSessionDestroy(t *testing.T) {
 	})
 	t.Run("returns error for destroy failing", func(t *testing.T) {
 		sessionStorage := &stubFailingSessionStorage{}
-		provider := &DefaultProvider{sessionStorage, dummyAdapter}
+		provider := &defaultProvider{sessionStorage, dummyAdapter}
 
 		err := provider.SessionDestroy("17af454")
 
@@ -179,7 +180,7 @@ func TestSessionGC(t *testing.T) {
 			Sessions: map[string]*stubSession{},
 		}
 
-		provider := &DefaultProvider{sessionStorage, func(maxAge int64) AgeChecker {
+		provider := &defaultProvider{sessionStorage, func(maxAge int64) AgeChecker {
 			return stubMilliAgeChecker(maxAge)
 		}}
 

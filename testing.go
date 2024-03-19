@@ -121,6 +121,11 @@ func (ss *stubSessionStorage) GetSession(sid string) (Session, error) {
 	return nil, nil
 }
 
+func (ss *stubSessionStorage) ContainsSession(sid string) (bool, error) {
+	_, ok := ss.Sessions[sid]
+	return ok, nil
+}
+
 func (ss *stubSessionStorage) ReapSession(sid string) error {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
@@ -139,10 +144,11 @@ func (ss *stubSessionStorage) Deadline(checker AgeChecker) {
 }
 
 type spySessionStorage struct {
-	callsToCreateSession int
-	callsToGetSession    int
-	callsToReapSession   int
-	callsToDeadline      int
+	callsToCreateSession   int
+	callsToGetSession      int
+	callsToContainsSession int
+	callsToReapSession     int
+	callsToDeadline        int
 }
 
 func (ss *spySessionStorage) CreateSession(sid string) (Session, error) {
@@ -153,6 +159,11 @@ func (ss *spySessionStorage) CreateSession(sid string) (Session, error) {
 func (ss *spySessionStorage) GetSession(sid string) (Session, error) {
 	ss.callsToGetSession++
 	return nil, nil
+}
+
+func (ss *spySessionStorage) ContainsSession(sid string) (bool, error) {
+	ss.callsToContainsSession++
+	return false, nil
 }
 
 func (ss *spySessionStorage) ReapSession(sid string) error {
@@ -178,6 +189,10 @@ func (ss *stubFailingSessionStorage) GetSession(sid string) (Session, error) {
 	return nil, errFoo
 }
 
+func (ss *stubFailingSessionStorage) ContainsSession(sid string) (bool, error) {
+	return false, errFoo
+}
+
 func (ss *stubFailingSessionStorage) ReapSession(sid string) error {
 	return errFoo
 }
@@ -186,11 +201,12 @@ func (ss *stubFailingSessionStorage) Deadline(checker AgeChecker) {
 }
 
 type mockSessionStorage struct {
-	Sessions          map[string]Session
-	CreateSessionFunc func(sid string) (Session, error)
-	GetSessionFunc    func(sid string) (Session, error)
-	ReapSessionFunc   func(sid string) error
-	DeadlineFunc      func(checker AgeChecker)
+	Sessions            map[string]Session
+	CreateSessionFunc   func(sid string) (Session, error)
+	GetSessionFunc      func(sid string) (Session, error)
+	ContainsSessionFunc func(sid string) (bool, error)
+	ReapSessionFunc     func(sid string) error
+	DeadlineFunc        func(checker AgeChecker)
 }
 
 func (ss *mockSessionStorage) CreateSession(sid string) (Session, error) {
@@ -199,6 +215,10 @@ func (ss *mockSessionStorage) CreateSession(sid string) (Session, error) {
 
 func (ss *mockSessionStorage) GetSession(sid string) (Session, error) {
 	return ss.GetSessionFunc(sid)
+}
+
+func (ss *mockSessionStorage) ContainsSession(sid string) (bool, error) {
+	return ss.ContainsSessionFunc(sid)
 }
 
 func (ss *mockSessionStorage) ReapSession(sid string) error {

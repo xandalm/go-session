@@ -24,6 +24,18 @@ type Provider interface {
 	SessionGC(maxAge int64)
 }
 
+// Manager allows to work with sessions.
+//
+// It can start or destroy one session. Both operations will
+// manipulate a http cookie.
+//
+// To start a session, it will:
+// - Creates a new one, setting a http cookie; or
+// - Retrieves, accordingly to the existent http cookie.
+//
+// To destroys a session, it can be forced or after it expires. The
+// expired session is removed through the GC routine, which checks
+// this condition.
 type Manager struct {
 	mu         sync.Mutex
 	provider   Provider
@@ -31,7 +43,16 @@ type Manager struct {
 	maxAge     int64
 }
 
+// Returns a new Manager (address for pointer reference).
+//
+// The provider cannot be nil and cookie name cannot be empty.
 func NewManager(provider Provider, cookieName string, maxAge int64) *Manager {
+	if provider == nil {
+		panic("nil provider")
+	}
+	if cookieName == "" {
+		panic("empty cookie name")
+	}
 	return &Manager{
 		provider:   provider,
 		cookieName: cookieName,
@@ -47,7 +68,18 @@ func (m *Manager) sessionID() string {
 	return base64.URLEncoding.EncodeToString(b)
 }
 
+func (m *Manager) assertProviderAndCookieName() {
+	if m.provider == nil {
+		panic("nil provider")
+	}
+	if m.cookieName == "" {
+		panic("empty cookie name")
+	}
+}
+
+// Creates or retrieve the session based on the http cookie.
 func (m *Manager) StartSession(w http.ResponseWriter, r *http.Request) (session Session) {
+	m.assertProviderAndCookieName()
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	cookie, err := r.Cookie(m.cookieName)
@@ -66,7 +98,9 @@ func (m *Manager) StartSession(w http.ResponseWriter, r *http.Request) (session 
 	return
 }
 
+// Destroys the session, finally cleaning up the http cookie.
 func (m *Manager) DestroySession(w http.ResponseWriter, r *http.Request) {
+	m.assertProviderAndCookieName()
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	cookie, err := r.Cookie(m.cookieName)
@@ -80,6 +114,7 @@ func (m *Manager) DestroySession(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Creates a routine to check for expired sessions and remove them.
 func (m *Manager) GC() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
