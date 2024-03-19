@@ -79,6 +79,22 @@ func (p *stubProvider) SessionDestroy(sid string) error {
 
 func (p *stubProvider) SessionGC(maxLifeTime int64) {}
 
+type stubFailingProvider struct{}
+
+func (p *stubFailingProvider) SessionInit(sid string) (Session, error) {
+	return nil, errFoo
+}
+
+func (p *stubFailingProvider) SessionRead(sid string) (Session, error) {
+	return nil, errFoo
+}
+
+func (p *stubFailingProvider) SessionDestroy(sid string) error {
+	return errFoo
+}
+
+func (p *stubFailingProvider) SessionGC(maxLifeTime int64) {}
+
 type stubSessionStorage struct {
 	mu       sync.Mutex
 	Sessions map[string]*stubSession

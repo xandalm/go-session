@@ -93,6 +93,23 @@ func TestManager(t *testing.T) {
 			t.Errorf("the cookie is not expired, Expires = %s and MaxAge = %d", newCookie.Expires, newCookie.MaxAge)
 		}
 	})
+
+	t.Run("panic when fail to start session", func(t *testing.T) {
+		provider := &stubFailingProvider{}
+		manager := NewManager(provider, cookieName, 3600)
+
+		defer func() {
+			r := recover()
+			if r != "unable to start the session" {
+				t.Errorf("didn't get expected panic, got: %v", r)
+			}
+		}()
+
+		req, _ := http.NewRequest(http.MethodGet, dummySite, nil)
+		res := httptest.NewRecorder()
+
+		manager.StartSession(res, req)
+	})
 }
 
 func getCookieFromResponse(res *httptest.ResponseRecorder) (cookie map[string]string) {
