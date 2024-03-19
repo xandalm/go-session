@@ -71,7 +71,7 @@ func (s *mockServer) handleLogIn(w http.ResponseWriter, r *http.Request, sess se
 	s.players = append(s.players, username)
 }
 
-func (s *mockServer) handleGetOnlinePlayers(w http.ResponseWriter, r *http.Request, sess session.Session) {
+func (s *mockServer) handleGetOnlinePlayers(w http.ResponseWriter, _ *http.Request, sess session.Session) {
 
 	if isLogged, ok := sess.Get("logged").(bool); !ok || !isLogged {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -81,7 +81,7 @@ func (s *mockServer) handleGetOnlinePlayers(w http.ResponseWriter, r *http.Reque
 	fmt.Fprint(w, strings.Join(s.players, ","))
 }
 
-func (s *mockServer) handleStartGame(w http.ResponseWriter, r *http.Request, sess session.Session) {
+func (s *mockServer) handleStartGame(w http.ResponseWriter, _ *http.Request, sess session.Session) {
 	logged, ok := sess.Get("logged").(bool)
 	if !ok || !logged {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -94,7 +94,7 @@ func (s *mockServer) handleStartGame(w http.ResponseWriter, r *http.Request, ses
 	}
 }
 
-func (s *mockServer) handleLeaveGame(w http.ResponseWriter, r *http.Request, sess session.Session) {
+func (s *mockServer) handleLeaveGame(w http.ResponseWriter, _ *http.Request, sess session.Session) {
 	logged, ok := sess.Get("logged").(bool)
 	if !ok || !logged {
 		w.WriteHeader(http.StatusUnauthorized)

@@ -96,7 +96,7 @@ func TestSessionRead(t *testing.T) {
 
 	sessionStorage := &stubSessionStorage{
 		Sessions: map[string]*stubSession{
-			"17af454": &stubSession{
+			"17af454": {
 				Id: "17af454",
 			},
 		},
@@ -140,7 +140,7 @@ func TestSessionDestroy(t *testing.T) {
 
 	sessionStorage := &stubSessionStorage{
 		Sessions: map[string]*stubSession{
-			"17af454": &stubSession{
+			"17af454": {
 				Id: "17af454",
 			},
 		},
