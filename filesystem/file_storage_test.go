@@ -110,7 +110,7 @@ func TestSetValueFromSession(t *testing.T) {
 	t.Run("panic when try to set a func", func(t *testing.T) {
 		defer func() {
 			r := recover()
-			if r == nil || r != "filesystem: cannot stores func into session" {
+			if r == nil || r != "cannot stores func into session" {
 				t.Errorf("didn't get expected panic, got %v", r)
 			}
 		}()
@@ -119,7 +119,7 @@ func TestSetValueFromSession(t *testing.T) {
 	t.Run("panic when try to set a chan", func(t *testing.T) {
 		defer func() {
 			r := recover()
-			if r == nil || r != "filesystem: cannot stores chan into session" {
+			if r == nil || r != "cannot stores chan into session" {
 				t.Errorf("didn't get expected panic, got %v", r)
 			}
 		}()

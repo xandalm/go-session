@@ -95,7 +95,7 @@ func TestStorage_CreateSession(t *testing.T) {
 		storage := newStorage()
 		defer func() {
 			r := recover()
-			if r == nil || r != "session: empty sid (session id)" {
+			if r == nil || r != "empty sid" {
 				t.Error("didn't panic")
 			}
 		}()

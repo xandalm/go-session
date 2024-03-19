@@ -55,7 +55,7 @@ func newStorage() *storage {
 
 func (s *storage) CreateSession(sid string) (sessionpkg.Session, error) {
 	if sid == "" {
-		panic("session: empty sid (session id)")
+		panic("empty sid")
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -107,4 +107,8 @@ func (s *storage) Deadline(checker sessionpkg.AgeChecker) {
 	}
 }
 
-var Storage = newStorage()
+var _storage = newStorage()
+
+func Storage() *storage {
+	return _storage
+}

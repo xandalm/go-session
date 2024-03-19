@@ -352,7 +352,7 @@ func getCookieFromResponse(res *httptest.ResponseRecorder) (cookie map[string]st
 }
 
 func TestSessionsWithMemoryStorage(t *testing.T) {
-	provider := session.NewDefaultProvider(memory.Storage, session.SecondsAgeCheckerAdapter)
+	provider := session.NewDefaultProvider(memory.Storage(), session.SecondsAgeCheckerAdapter)
 	manager := session.NewManager(provider, "SESSION_ID", 1)
 
 	performTest(t, manager)
