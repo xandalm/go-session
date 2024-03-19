@@ -327,8 +327,10 @@ func (s *storage) update(sess *session) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if err := s.io.Write(sess); err != nil {
-		return err
+	if _, ok := s.m[sess.id]; ok {
+		if err := s.io.Write(sess); err != nil {
+			return err
+		}
 	}
 	return nil
 }
