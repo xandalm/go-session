@@ -410,7 +410,8 @@ func TestDefaultStorageIO(t *testing.T) {
 	t.Run("writes updated session attributes", func(t *testing.T) {
 		sess, _ := io.Read("abcde")
 
-		sess.v["role"] = "test"
+		sess.v["name"] = "Ana"
+		sess.v["role"] = "tester"
 
 		err := io.Write(sess)
 
@@ -421,6 +422,20 @@ func TestDefaultStorageIO(t *testing.T) {
 		if sess.id != got.id || !sess.ct.Equal(got.ct) || !reflect.DeepEqual(sess.v, got.v) {
 			t.Errorf("didn't update session, got %s but want %s", writeSessionToString(got), writeSessionToString(sess))
 		}
+
+		t.Run("even after remove value", func(t *testing.T) {
+			delete(sess.v, "role")
+
+			err := io.Write(sess)
+
+			assert.NoError(t, err)
+
+			got, _ := io.Read(sess.id)
+
+			if sess.id != got.id || !sess.ct.Equal(got.ct) || !reflect.DeepEqual(sess.v, got.v) {
+				t.Errorf("didn't update session, got %s but want %s", writeSessionToString(got), writeSessionToString(sess))
+			}
+		})
 	})
 	t.Run("deletes session from the file system", func(t *testing.T) {
 		sid := "abcde"
