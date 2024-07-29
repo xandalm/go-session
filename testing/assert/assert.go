@@ -83,19 +83,23 @@ func Equal[T any](t testing.TB, got, want T, out ...any) {
 	}
 }
 
-func NoError(t testing.TB, err error, out ...any) {
+func NoError(t testing.TB, err, nwant error, out ...any) {
 	t.Helper()
 
-	if err != nil {
-		common := fmt.Sprintf("expect no error, got %v", err)
+	if err == nwant {
+		common := fmt.Sprintf("didn't want error %v, but got it", err)
 		t.Fatal(output(common, out))
 	}
 }
 
-func Error(t testing.TB, err error, out ...any) {
+func Error(t testing.TB, got, want error, out ...any) {
 	t.Helper()
 
-	if err == nil {
-		t.Fatal(output("expect error, but didn't got one", out))
+	if got == nil {
+		t.Fatal(output("didn't get an error", out))
+	}
+	if got != want {
+		common := fmt.Sprintf("got error %v, but want %v", got, want)
+		t.Fatal(output(common, out))
 	}
 }

@@ -97,108 +97,159 @@ func (p *stubFailingProvider) SessionGC(maxLifeTime int64) {}
 
 type stubSessionStorage struct {
 	mu       sync.Mutex
-	Sessions map[string]*stubSession
+	Sessions map[string]Session
 }
 
 func newStubSessionStorage() *stubSessionStorage {
 	return &stubSessionStorage{
-		Sessions: make(map[string]*stubSession),
+		Sessions: make(map[string]Session),
 	}
 }
 
-func (ss *stubSessionStorage) CreateSession(sid string) (Session, error) {
+func (ss *stubSessionStorage) Save(sess Session) error {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
-	sess := newStubSession(sid)
-	ss.Sessions[sid] = sess
-	return sess, nil
+	ss.Sessions[sess.SessionID()] = sess
+	return nil
 }
 
-func (ss *stubSessionStorage) GetSession(sid string) (Session, error) {
+func (ss *stubSessionStorage) Load(sid string) (Session, error) {
 	if sess, ok := ss.Sessions[sid]; ok {
 		return sess, nil
 	}
 	return nil, nil
 }
 
-func (ss *stubSessionStorage) ContainsSession(sid string) (bool, error) {
-	_, ok := ss.Sessions[sid]
-	return ok, nil
-}
-
-func (ss *stubSessionStorage) ReapSession(sid string) error {
+func (ss *stubSessionStorage) Delete(sid string) error {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 	delete(ss.Sessions, sid)
 	return nil
 }
 
-func (ss *stubSessionStorage) Deadline(checker AgeChecker) {
-	ss.mu.Lock()
-	defer ss.mu.Unlock()
-	for k, v := range ss.Sessions {
-		if checker.ShouldReap(v.CreatedAt) {
-			delete(ss.Sessions, k)
-		}
-	}
-}
+// func (ss *stubSessionStorage) CreateSession(sid string) (Session, error) {
+// 	ss.mu.Lock()
+// 	defer ss.mu.Unlock()
+// 	sess := newStubSession(sid)
+// 	ss.Sessions[sid] = sess
+// 	return sess, nil
+// }
+
+// func (ss *stubSessionStorage) GetSession(sid string) (Session, error) {
+// 	if sess, ok := ss.Sessions[sid]; ok {
+// 		return sess, nil
+// 	}
+// 	return nil, nil
+// }
+
+// func (ss *stubSessionStorage) ContainsSession(sid string) (bool, error) {
+// 	_, ok := ss.Sessions[sid]
+// 	return ok, nil
+// }
+
+// func (ss *stubSessionStorage) ReapSession(sid string) error {
+// 	ss.mu.Lock()
+// 	defer ss.mu.Unlock()
+// 	delete(ss.Sessions, sid)
+// 	return nil
+// }
+
+// func (ss *stubSessionStorage) Deadline(checker AgeChecker) {
+// 	ss.mu.Lock()
+// 	defer ss.mu.Unlock()
+// 	for k, v := range ss.Sessions {
+// 		if checker.ShouldReap(v.CreatedAt) {
+// 			delete(ss.Sessions, k)
+// 		}
+// 	}
+// }
 
 type spySessionStorage struct {
-	callsToCreateSession   int
-	callsToGetSession      int
-	callsToContainsSession int
-	callsToReapSession     int
-	callsToDeadline        int
+	callsToSave   int
+	callsToLoad   int
+	callsToDelete int
+	// callsToCreateSession   int
+	// callsToGetSession      int
+	// callsToContainsSession int
+	// callsToReapSession     int
+	// callsToDeadline        int
 }
 
-func (ss *spySessionStorage) CreateSession(sid string) (Session, error) {
-	ss.callsToCreateSession++
-	return nil, nil
-}
-
-func (ss *spySessionStorage) GetSession(sid string) (Session, error) {
-	ss.callsToGetSession++
-	return nil, nil
-}
-
-func (ss *spySessionStorage) ContainsSession(sid string) (bool, error) {
-	ss.callsToContainsSession++
-	return false, nil
-}
-
-func (ss *spySessionStorage) ReapSession(sid string) error {
-	ss.callsToReapSession++
+func (ss *spySessionStorage) Save(sess Session) error {
+	ss.callsToSave++
 	return nil
 }
 
-func (ss *spySessionStorage) Deadline(checker AgeChecker) {
-	ss.callsToDeadline++
+func (ss *spySessionStorage) Load(sid string) (Session, error) {
+	ss.callsToLoad++
+	return nil, nil
 }
+
+func (ss *spySessionStorage) Delete(sid string) error {
+	ss.callsToDelete++
+	return nil
+}
+
+// func (ss *spySessionStorage) CreateSession(sid string) (Session, error) {
+// 	ss.callsToCreateSession++
+// 	return nil, nil
+// }
+
+// func (ss *spySessionStorage) GetSession(sid string) (Session, error) {
+// 	ss.callsToGetSession++
+// 	return nil, nil
+// }
+
+// func (ss *spySessionStorage) ContainsSession(sid string) (bool, error) {
+// 	ss.callsToContainsSession++
+// 	return false, nil
+// }
+
+// func (ss *spySessionStorage) ReapSession(sid string) error {
+// 	ss.callsToReapSession++
+// 	return nil
+// }
+
+// func (ss *spySessionStorage) Deadline(checker AgeChecker) {
+// 	ss.callsToDeadline++
+// }
+
+var errFoo error = errors.New("foo error")
 
 type stubFailingSessionStorage struct {
 	Sessions map[string]Session
 }
 
-var errFoo error = errors.New("foo error")
-
-func (ss *stubFailingSessionStorage) CreateSession(sid string) (Session, error) {
-	return nil, errFoo
-}
-
-func (ss *stubFailingSessionStorage) GetSession(sid string) (Session, error) {
-	return nil, errFoo
-}
-
-func (ss *stubFailingSessionStorage) ContainsSession(sid string) (bool, error) {
-	return false, errFoo
-}
-
-func (ss *stubFailingSessionStorage) ReapSession(sid string) error {
+func (ss *stubFailingSessionStorage) Save(sess Session) error {
 	return errFoo
 }
 
-func (ss *stubFailingSessionStorage) Deadline(checker AgeChecker) {
+func (ss *stubFailingSessionStorage) Load(sid string) (Session, error) {
+	return nil, errFoo
 }
+
+func (ss *stubFailingSessionStorage) Delete(sid string) error {
+	return errFoo
+}
+
+// func (ss *stubFailingSessionStorage) CreateSession(sid string) (Session, error) {
+// 	return nil, errFoo
+// }
+
+// func (ss *stubFailingSessionStorage) GetSession(sid string) (Session, error) {
+// 	return nil, errFoo
+// }
+
+// func (ss *stubFailingSessionStorage) ContainsSession(sid string) (bool, error) {
+// 	return false, errFoo
+// }
+
+// func (ss *stubFailingSessionStorage) ReapSession(sid string) error {
+// 	return errFoo
+// }
+
+// func (ss *stubFailingSessionStorage) Deadline(checker AgeChecker) {
+// }
 
 type mockSessionStorage struct {
 	Sessions            map[string]Session
