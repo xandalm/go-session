@@ -286,3 +286,60 @@ func (m stubMilliAgeChecker) ShouldReap(t time.Time) bool {
 	diff := time.Now().UnixMilli() - t.UnixMilli()
 	return diff > int64(m)
 }
+
+type stubCache map[string]Session
+
+func (c stubCache) Add(sess Session) {
+	c[sess.SessionID()] = sess
+}
+
+func (c stubCache) Contains(sid string) bool {
+	_, ok := c[sid]
+	return ok
+}
+
+func (c stubCache) ExpiredSessions(checker AgeChecker) []string {
+	return []string{}
+}
+
+func (c stubCache) Remove(sid string) {
+	delete(c, sid)
+}
+
+func (c stubCache) Get(sid string) Session {
+	if g, ok := c[sid]; ok {
+		return g
+	}
+	return nil
+}
+
+type spyCache struct {
+	callsToAdd             int
+	callsToContains        int
+	callsToExpiredSessions int
+	callsToRemove          int
+	callsToGet             int
+}
+
+func (c *spyCache) Add(sess Session) {
+	c.callsToAdd++
+}
+
+func (c *spyCache) Contains(sid string) bool {
+	c.callsToContains++
+	return false
+}
+
+func (c *spyCache) ExpiredSessions(checker AgeChecker) []string {
+	c.callsToExpiredSessions++
+	return nil
+}
+
+func (c *spyCache) Remove(sid string) {
+	c.callsToRemove++
+}
+
+func (c *spyCache) Get(sid string) Session {
+	c.callsToGet++
+	return nil
+}

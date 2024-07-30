@@ -26,11 +26,11 @@ type Storage interface {
 }
 
 type Provider interface {
-	SessionInit(sid string)
-	SessionRead(sid string)
-	SessionDestroy(sid string)
+	SessionInit(sid string) (Session, error)
+	SessionRead(sid string) (Session, error)
+	SessionDestroy(sid string) error
 	SessionGC(maxAge int64)
-	Storage()
+	Storage() Storage
 }
 
 type AgeChecker interface {
@@ -94,16 +94,17 @@ func (c *cache) find(sid string) *cacheNode {
 	return nil
 }
 
-func (c *cache) Add(sess *session) {
+func (c *cache) Add(sess Session) {
+	s := sess.(*session)
 	node := &cacheNode{
 		&sessionInfo{
-			sess.id,
-			sess.ct,
-			sess.at,
+			s.id,
+			s.ct,
+			s.at,
 		}, 0, nil,
 	}
 	node.anchor = c.collec.PushBack(node)
-	node.sidIdxPos, _ = c.findIndex(sess.id)
+	node.sidIdxPos, _ = c.findIndex(s.id)
 	c.sidIdx = slices.Insert(c.sidIdx, node.sidIdxPos, node)
 }
 
@@ -143,9 +144,28 @@ func (c *cache) ExpiredSessions(checker AgeChecker) []string {
 	return ret
 }
 
+func (c *cache) Get(sid string) Session {
+	if found := c.find(sid); found != nil {
+		return &session{
+			id: found.info.sid,
+			ct: found.info.ct,
+			at: found.info.at,
+		}
+	}
+	return nil
+}
+
+type cacheI interface {
+	Add(sess Session)
+	Contains(sid string) bool
+	ExpiredSessions(checker AgeChecker) []string
+	Remove(sid string)
+	Get(sid string) Session
+}
+
 // Provider that communicates with storage api to init, read and destroy sessions.
 type defaultProvider struct {
-	cached            *cache
+	cached            cacheI
 	storage           Storage
 	ageCheckerAdapter AgeCheckerAdapter
 }
@@ -207,15 +227,10 @@ func (p *defaultProvider) SessionInit(sid string) (Session, error) {
 // Returns error when cannot get session through storage api, or cannot
 // create one. Otherwise, will return the session.
 func (p *defaultProvider) SessionRead(sid string) (Session, error) {
-	sess, err := p.storage.Load(sid)
-	if err != nil {
-		return nil, ErrUnableToRestoreSession
+	if sess := p.cached.Get(sid); sess != nil {
+		return sess, nil
 	}
-	if sess == nil {
-		sess, err = p.SessionInit(sid)
-		return sess, err
-	}
-	return sess, nil
+	return p.SessionInit(sid)
 }
 
 // Destroys the session.

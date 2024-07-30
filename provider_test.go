@@ -13,20 +13,21 @@ var dummyAdapter = func(maxAge int64) AgeChecker {
 }
 
 func TestSessionInit(t *testing.T) {
-	// t.Run("tell storage to create session", func(t *testing.T) {
-	// 	sessionStorage := &spySessionStorage{}
-
-	// 	provider := &defaultProvider{newCache(), sessionStorage, dummyAdapter}
-
-	// 	_, err := provider.SessionInit("1")
-	// 	assert.NoError(t, err)
-
-	// 	if sessionStorage.callsToCreateSession == 0 {
-	// 		t.Error("didn't tell storage")
-	// 	}
-	// })
 
 	dummyStorage := newStubSessionStorage()
+
+	t.Run("tell cache to add session", func(t *testing.T) {
+		cache := &spyCache{}
+
+		provider := &defaultProvider{cache, dummyStorage, dummyAdapter}
+
+		_, err := provider.SessionInit("1")
+		assert.Nil(t, err)
+
+		if cache.callsToAdd == 0 {
+			t.Error("didn't tell cache to add")
+		}
+	})
 
 	provider := &defaultProvider{newCache(), dummyStorage, dummyAdapter}
 	t.Run("init the session", func(t *testing.T) {
@@ -52,26 +53,26 @@ func TestSessionInit(t *testing.T) {
 
 func TestSessionRead(t *testing.T) {
 
-	t.Run("tell storage to get session", func(t *testing.T) {
-		sessionStorage := &spySessionStorage{}
+	dummyStorage := newStubSessionStorage()
 
-		provider := &defaultProvider{newCache(), sessionStorage, dummyAdapter}
+	t.Run("tell cache to get session", func(t *testing.T) {
+		cache := &spyCache{}
+
+		provider := &defaultProvider{cache, dummyStorage, dummyAdapter}
 
 		_, err := provider.SessionRead("1")
 		assert.Nil(t, err)
 
-		if sessionStorage.callsToLoad == 0 {
-			t.Error("didn't tell storage")
+		if cache.callsToGet == 0 {
+			t.Error("didn't tell cache to get")
 		}
 	})
 
-	sessionStorage := &stubSessionStorage{
-		Sessions: map[string]Session{
-			"17af454": newStubSession("17af454"),
-		},
+	cache := stubCache{
+		"17af454": newStubSession("17af454"),
 	}
 
-	provider := &defaultProvider{newCache(), sessionStorage, dummyAdapter}
+	provider := &defaultProvider{cache, dummyStorage, dummyAdapter}
 
 	t.Run("returns session", func(t *testing.T) {
 		sid := "17af454"
@@ -94,14 +95,6 @@ func TestSessionRead(t *testing.T) {
 		if session.SessionID() != sid {
 			t.Errorf("didn't get expected session, got %s but want %s", session.SessionID(), sid)
 		}
-	})
-	t.Run("returns error on failing session restoration", func(t *testing.T) {
-		sessionStorage := &stubFailingSessionStorage{}
-		provider := &defaultProvider{newCache(), sessionStorage, dummyAdapter}
-
-		_, err := provider.SessionRead("17af454")
-
-		assert.Error(t, err, ErrUnableToRestoreSession)
 	})
 }
 
@@ -161,7 +154,7 @@ func TestSessionGC(t *testing.T) {
 			t.Fatal("didn't destroy session")
 		}
 
-		if provider.cached.collec.Len() != 1 {
+		if provider.cached.(*cache).collec.Len() != 1 {
 			t.Errorf("expected the session with id=%s in storage", sid2)
 		}
 	})
