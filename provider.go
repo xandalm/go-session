@@ -3,6 +3,7 @@ package session
 import (
 	"container/list"
 	"errors"
+	"slices"
 	"time"
 )
 
@@ -55,66 +56,88 @@ type sessionInfo struct {
 	at  time.Time
 }
 
-type index struct {
-	sessions  *list.List // absolute sessions (sessionInfo)
-	sidSorted *list.List // sorted by id
-	ctSorted  *list.List // serted by creation time
+type cacheNode struct {
+	info      *sessionInfo
+	sidIdxPos int
+	anchor    *list.Element
 }
 
-func newIndex() *index {
-	return &index{
+type cache struct {
+	collec *list.List   // absolute sessions (sessionInfo)
+	sidIdx []*cacheNode // sorted by id
+}
+
+func newCache() *cache {
+	return &cache{
 		list.New(),
-		list.New(),
-		list.New(),
+		[]*cacheNode{},
 	}
 }
 
-func (idx *index) find(sid string) *list.Element {
-	elem := idx.sessions.Front()
-	for {
-		if elem == nil || elem.Value.(*sessionInfo).sid == sid {
-			break
+func (c *cache) findIndex(sid string) (int, bool) {
+	return slices.BinarySearchFunc(c.sidIdx, sid, func(in *cacheNode, s string) int {
+		if in.info.sid < s {
+			return -1
 		}
-		elem = elem.Next()
-	}
-	return elem
-}
-
-func (idx *index) Add(sess *session) {
-	idx.sessions.PushBack(&sessionInfo{
-		sess.id,
-		sess.ct,
-		sess.at,
+		if in.info.sid > s {
+			return 1
+		}
+		return 0
 	})
 }
 
-func (idx *index) Remove(sid string) {
-	found := idx.find(sid)
-	idx.remove(found)
+func (c *cache) find(sid string) *cacheNode {
+	pos, has := c.findIndex(sid)
+	if has {
+		return c.sidIdx[pos]
+	}
+	return nil
 }
 
-func (idx *index) remove(e *list.Element) {
-	idx.sessions.Remove(e)
+func (c *cache) Add(sess *session) {
+	node := &cacheNode{
+		&sessionInfo{
+			sess.id,
+			sess.ct,
+			sess.at,
+		}, 0, nil,
+	}
+	node.anchor = c.collec.PushBack(node)
+	node.sidIdxPos, _ = c.findIndex(sess.id)
+	c.sidIdx = slices.Insert(c.sidIdx, node.sidIdxPos, node)
 }
 
-func (idx *index) Contains(sid string) bool {
-	found := idx.find(sid)
-	return found != nil
+func (c *cache) Remove(sid string) {
+	found := c.find(sid)
+	if found == nil {
+		return
+	}
+	c.remove(found)
 }
 
-func (idx *index) ExpiredSessions(checker AgeChecker) []string {
+func (c *cache) remove(n *cacheNode) {
+	c.collec.Remove(n.anchor)
+	c.sidIdx = slices.Delete(c.sidIdx, n.sidIdxPos, n.sidIdxPos+1)
+}
+
+func (c *cache) Contains(sid string) bool {
+	_, has := c.findIndex(sid)
+	return has
+}
+
+func (c *cache) ExpiredSessions(checker AgeChecker) []string {
 	var ret []string
-	elem := idx.sessions.Front()
+	elem := c.collec.Front()
 	for {
 		if elem == nil {
 			break
 		}
-		sess := elem.Value.(*sessionInfo)
-		if !checker.ShouldReap(sess.ct) {
+		node := elem.Value.(*cacheNode)
+		if !checker.ShouldReap(node.info.ct) {
 			break
 		}
-		idx.remove(elem)
-		ret = append(ret, sess.sid)
+		c.remove(node)
+		ret = append(ret, node.info.sid)
 		elem = elem.Next()
 	}
 	return ret
@@ -122,7 +145,7 @@ func (idx *index) ExpiredSessions(checker AgeChecker) []string {
 
 // Provider that communicates with storage api to init, read and destroy sessions.
 type defaultProvider struct {
-	idx               *index
+	cached            *cache
 	storage           Storage
 	ageCheckerAdapter AgeCheckerAdapter
 }
@@ -136,7 +159,7 @@ func NewProvider(storage Storage, adapter AgeCheckerAdapter) *defaultProvider {
 		adapter = SecondsAgeCheckerAdapter
 	}
 	return &defaultProvider{
-		&index{},
+		&cache{},
 		storage,
 		adapter,
 	}
@@ -164,7 +187,7 @@ func (p *defaultProvider) SessionInit(sid string) (Session, error) {
 	if sid == "" {
 		return nil, ErrEmptySessionId
 	}
-	contains := p.idx.Contains(sid)
+	contains := p.cached.Contains(sid)
 	if contains {
 		return nil, ErrDuplicatedSessionId
 	}
@@ -174,7 +197,7 @@ func (p *defaultProvider) SessionInit(sid string) (Session, error) {
 		time.Now(),
 		time.Now(),
 	}
-	p.idx.Add(sess)
+	p.cached.Add(sess)
 	return sess, nil
 }
 
@@ -209,7 +232,7 @@ func (p *defaultProvider) SessionDestroy(sid string) error {
 // Checks for expired sessions through storage api, and remove them.
 // The maxAge will be adapted accordingly to AgeCheckerAdapter
 func (p *defaultProvider) SessionGC(maxAge int64) {
-	for _, sid := range p.idx.ExpiredSessions(p.ageCheckerAdapter(maxAge)) {
+	for _, sid := range p.cached.ExpiredSessions(p.ageCheckerAdapter(maxAge)) {
 		p.storage.Delete(sid)
 	}
 }
