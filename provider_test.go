@@ -8,10 +8,6 @@ import (
 	"github.com/xandalm/go-session/testing/assert"
 )
 
-var dummyAdapter = func(maxAge int64) AgeChecker {
-	return nil
-}
-
 func TestSessionInit(t *testing.T) {
 
 	dummyStorage := newStubSessionStorage()
@@ -19,10 +15,9 @@ func TestSessionInit(t *testing.T) {
 	t.Run("tell cache to add session", func(t *testing.T) {
 		cache := &spyCache{}
 
-		provider := &defaultProvider{
-			cached:            cache,
-			storage:           dummyStorage,
-			ageCheckerAdapter: dummyAdapter,
+		provider := &provider{
+			cached:  cache,
+			storage: dummyStorage,
 		}
 
 		_, err := provider.SessionInit("1")
@@ -34,10 +29,9 @@ func TestSessionInit(t *testing.T) {
 	})
 
 	cache := stubCache{}
-	provider := &defaultProvider{
-		cached:            cache,
-		storage:           dummyStorage,
-		ageCheckerAdapter: dummyAdapter,
+	provider := &provider{
+		cached:  cache,
+		storage: dummyStorage,
 	}
 
 	t.Run("init the session", func(t *testing.T) {
@@ -72,10 +66,9 @@ func TestSessionRead(t *testing.T) {
 	t.Run("tell cache to get session", func(t *testing.T) {
 		cache := &spyCache{}
 
-		provider := &defaultProvider{
-			cached:            cache,
-			storage:           dummyStorage,
-			ageCheckerAdapter: dummyAdapter,
+		provider := &provider{
+			cached:  cache,
+			storage: dummyStorage,
 		}
 
 		_, err := provider.SessionRead("1")
@@ -90,10 +83,9 @@ func TestSessionRead(t *testing.T) {
 		"17af454": newStubSession("17af454"),
 	}
 
-	provider := &defaultProvider{
-		cached:            cache,
-		storage:           dummyStorage,
-		ageCheckerAdapter: dummyAdapter,
+	provider := &provider{
+		cached:  cache,
+		storage: dummyStorage,
 	}
 
 	t.Run("returns session", func(t *testing.T) {
@@ -136,10 +128,9 @@ func TestSessionDestroy(t *testing.T) {
 		session.SessionID(): session,
 	}
 
-	provider := &defaultProvider{
-		cached:            cache,
-		storage:           storage,
-		ageCheckerAdapter: dummyAdapter,
+	provider := &provider{
+		cached:  cache,
+		storage: storage,
 	}
 
 	t.Run("destroys session", func(t *testing.T) {
@@ -193,12 +184,9 @@ func TestSessionGC(t *testing.T) {
 			return ret
 		}
 
-		provider := &defaultProvider{
+		provider := &provider{
 			cached:  c,
 			storage: storage,
-			ageCheckerAdapter: func(maxAge int64) AgeChecker {
-				return stubMilliAgeChecker(maxAge)
-			},
 		}
 
 		sid1 := "17af450"
@@ -210,7 +198,7 @@ func TestSessionGC(t *testing.T) {
 
 		provider.SessionInit(sid2)
 
-		provider.SessionGC(1)
+		provider.SessionGC(stubMilliAgeChecker(1))
 
 		if provider.cached.Contains(sid1) {
 			t.Fatal("didn't destroy session")

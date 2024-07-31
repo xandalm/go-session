@@ -77,7 +77,7 @@ func (p *stubProvider) SessionDestroy(sid string) error {
 	return nil
 }
 
-func (p *stubProvider) SessionGC(maxLifeTime int64) {}
+func (p *stubProvider) SessionGC(checker AgeChecker) {}
 
 type stubFailingProvider struct{}
 
@@ -93,7 +93,7 @@ func (p *stubFailingProvider) SessionDestroy(sid string) error {
 	return errFoo
 }
 
-func (p *stubFailingProvider) SessionGC(maxLifeTime int64) {}
+func (p *stubFailingProvider) SessionGC(checker AgeChecker) {}
 
 type stubSessionStorage struct {
 	mu       sync.Mutex
@@ -287,6 +287,10 @@ type stubMilliAgeChecker int64
 func (m stubMilliAgeChecker) ShouldReap(t time.Time) bool {
 	diff := time.Now().UnixMilli() - t.UnixMilli()
 	return diff > int64(m)
+}
+
+func stubMilliAgeCheckerAdapter(v int64) AgeChecker {
+	return stubMilliAgeChecker(v)
 }
 
 type stubCache map[string]Session
