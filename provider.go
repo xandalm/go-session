@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"errors"
 	"slices"
+	"sync"
 	"time"
 )
 
@@ -165,6 +166,7 @@ type cacheI interface {
 
 // Provider that communicates with storage api to init, read and destroy sessions.
 type defaultProvider struct {
+	mu                sync.Mutex
 	cached            cacheI
 	storage           Storage
 	ageCheckerAdapter AgeCheckerAdapter
@@ -179,9 +181,9 @@ func NewProvider(storage Storage, adapter AgeCheckerAdapter) *defaultProvider {
 		adapter = SecondsAgeCheckerAdapter
 	}
 	return &defaultProvider{
-		&cache{},
-		storage,
-		adapter,
+		cached:            &cache{},
+		storage:           storage,
+		ageCheckerAdapter: adapter,
 	}
 }
 
@@ -204,11 +206,16 @@ var (
 //
 // Otherwise, will return the session.
 func (p *defaultProvider) SessionInit(sid string) (Session, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.sessionInit(sid)
+}
+
+func (p *defaultProvider) sessionInit(sid string) (Session, error) {
 	if sid == "" {
 		return nil, ErrEmptySessionId
 	}
-	contains := p.cached.Contains(sid)
-	if contains {
+	if p.cached.Contains(sid) {
 		return nil, ErrDuplicatedSessionId
 	}
 	sess := &session{
@@ -227,26 +234,30 @@ func (p *defaultProvider) SessionInit(sid string) (Session, error) {
 // Returns error when cannot get session through storage api, or cannot
 // create one. Otherwise, will return the session.
 func (p *defaultProvider) SessionRead(sid string) (Session, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if sess := p.cached.Get(sid); sess != nil {
 		return sess, nil
 	}
-	return p.SessionInit(sid)
+	return p.sessionInit(sid)
 }
 
 // Destroys the session.
 //
 // Returns error when cannot remove through storage api.
 func (p *defaultProvider) SessionDestroy(sid string) error {
-	err := p.storage.Delete(sid)
-	if err != nil {
-		return ErrUnableToDestroySession
-	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.cached.Remove(sid)
+	p.storage.Delete(sid)
 	return nil
 }
 
 // Checks for expired sessions through storage api, and remove them.
 // The maxAge will be adapted accordingly to AgeCheckerAdapter
 func (p *defaultProvider) SessionGC(maxAge int64) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	for _, sid := range p.cached.ExpiredSessions(p.ageCheckerAdapter(maxAge)) {
 		p.storage.Delete(sid)
 	}

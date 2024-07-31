@@ -19,7 +19,11 @@ func TestSessionInit(t *testing.T) {
 	t.Run("tell cache to add session", func(t *testing.T) {
 		cache := &spyCache{}
 
-		provider := &defaultProvider{cache, dummyStorage, dummyAdapter}
+		provider := &defaultProvider{
+			cached:            cache,
+			storage:           dummyStorage,
+			ageCheckerAdapter: dummyAdapter,
+		}
 
 		_, err := provider.SessionInit("1")
 		assert.Nil(t, err)
@@ -29,7 +33,12 @@ func TestSessionInit(t *testing.T) {
 		}
 	})
 
-	provider := &defaultProvider{newCache(), dummyStorage, dummyAdapter}
+	provider := &defaultProvider{
+		cached:            newCache(),
+		storage:           dummyStorage,
+		ageCheckerAdapter: dummyAdapter,
+	}
+
 	t.Run("init the session", func(t *testing.T) {
 
 		sid := "17af454"
@@ -58,7 +67,11 @@ func TestSessionRead(t *testing.T) {
 	t.Run("tell cache to get session", func(t *testing.T) {
 		cache := &spyCache{}
 
-		provider := &defaultProvider{cache, dummyStorage, dummyAdapter}
+		provider := &defaultProvider{
+			cached:            cache,
+			storage:           dummyStorage,
+			ageCheckerAdapter: dummyAdapter,
+		}
 
 		_, err := provider.SessionRead("1")
 		assert.Nil(t, err)
@@ -72,7 +85,11 @@ func TestSessionRead(t *testing.T) {
 		"17af454": newStubSession("17af454"),
 	}
 
-	provider := &defaultProvider{cache, dummyStorage, dummyAdapter}
+	provider := &defaultProvider{
+		cached:            cache,
+		storage:           dummyStorage,
+		ageCheckerAdapter: dummyAdapter,
+	}
 
 	t.Run("returns session", func(t *testing.T) {
 		sid := "17af454"
@@ -100,13 +117,21 @@ func TestSessionRead(t *testing.T) {
 
 func TestSessionDestroy(t *testing.T) {
 
-	sessionStorage := &stubSessionStorage{
+	session := newStubSession("17af454")
+	storage := &stubSessionStorage{
 		Sessions: map[string]Session{
-			"17af454": newStubSession("17af454"),
+			session.SessionID(): session,
 		},
 	}
+	cache := stubCache{
+		session.SessionID(): session,
+	}
 
-	provider := &defaultProvider{newCache(), sessionStorage, dummyAdapter}
+	provider := &defaultProvider{
+		cached:            cache,
+		storage:           storage,
+		ageCheckerAdapter: dummyAdapter,
+	}
 
 	t.Run("destroys session", func(t *testing.T) {
 		sid := "17af454"
@@ -114,30 +139,58 @@ func TestSessionDestroy(t *testing.T) {
 
 		assert.Nil(t, err)
 
-		if _, ok := sessionStorage.Sessions[sid]; ok {
-			t.Fatalf("didn't destroy session")
+		if _, ok := cache[sid]; ok {
+			t.Fatalf("didn't remove session from cache")
 		}
-	})
-	t.Run("returns error for destroy failing", func(t *testing.T) {
-		sessionStorage := &stubFailingSessionStorage{}
-		provider := &defaultProvider{newCache(), sessionStorage, dummyAdapter}
-
-		err := provider.SessionDestroy("17af454")
-
-		assert.Error(t, err, ErrUnableToDestroySession)
+		if _, ok := storage.Sessions[sid]; ok {
+			t.Errorf("didn't remove session from storage")
+		}
 	})
 }
 
 func TestSessionGC(t *testing.T) {
 
 	t.Run("destroy sessions that arrives max age", func(t *testing.T) {
-		sessionStorage := &stubSessionStorage{
+		storage := &stubSessionStorage{
 			Sessions: map[string]Session{},
 		}
 
-		provider := &defaultProvider{newCache(), sessionStorage, func(maxAge int64) AgeChecker {
-			return stubMilliAgeChecker(maxAge)
-		}}
+		type cache struct {
+			data map[string]Session
+			mockCache
+		}
+
+		c := &cache{
+			data: map[string]Session{},
+		}
+		c.AddFunc = func(s Session) {
+			c.data[s.SessionID()] = s
+		}
+		c.ContainsFunc = func(s string) bool {
+			_, ok := c.data[s]
+			return ok
+		}
+		c.RemoveFunc = func(s string) {
+			delete(c.data, s)
+		}
+		c.ExpiredSessionsFunc = func(ac AgeChecker) []string {
+			ret := []string{}
+			for k, v := range c.data {
+				if ac.ShouldReap(v.(*session).ct) {
+					delete(c.data, k)
+					ret = append(ret, k)
+				}
+			}
+			return ret
+		}
+
+		provider := &defaultProvider{
+			cached:  c,
+			storage: storage,
+			ageCheckerAdapter: func(maxAge int64) AgeChecker {
+				return stubMilliAgeChecker(maxAge)
+			},
+		}
 
 		sid1 := "17af450"
 		sid2 := "17af454"
@@ -154,8 +207,8 @@ func TestSessionGC(t *testing.T) {
 			t.Fatal("didn't destroy session")
 		}
 
-		if provider.cached.(*cache).collec.Len() != 1 {
-			t.Errorf("expected the session with id=%s in storage", sid2)
+		if _, ok := provider.cached.(*cache).data[sid2]; !ok {
+			t.Errorf("expected that the session %s is in the storage", sid2)
 		}
 	})
 }

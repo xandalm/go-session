@@ -114,6 +114,8 @@ func (ss *stubSessionStorage) Save(sess Session) error {
 }
 
 func (ss *stubSessionStorage) Load(sid string) (Session, error) {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
 	if sess, ok := ss.Sessions[sid]; ok {
 		return sess, nil
 	}
@@ -299,7 +301,7 @@ func (c stubCache) Contains(sid string) bool {
 }
 
 func (c stubCache) ExpiredSessions(checker AgeChecker) []string {
-	return []string{}
+	return nil
 }
 
 func (c stubCache) Remove(sid string) {
@@ -311,6 +313,34 @@ func (c stubCache) Get(sid string) Session {
 		return g
 	}
 	return nil
+}
+
+type mockCache struct {
+	AddFunc             func(Session)
+	ContainsFunc        func(string) bool
+	ExpiredSessionsFunc func(AgeChecker) []string
+	RemoveFunc          func(string)
+	GetFunc             func(string) Session
+}
+
+func (c *mockCache) Add(sess Session) {
+	c.AddFunc(sess)
+}
+
+func (c *mockCache) Contains(sid string) bool {
+	return c.ContainsFunc(sid)
+}
+
+func (c *mockCache) ExpiredSessions(checker AgeChecker) []string {
+	return c.ExpiredSessionsFunc(checker)
+}
+
+func (c *mockCache) Remove(sid string) {
+	c.RemoveFunc(sid)
+}
+
+func (c *mockCache) Get(sid string) Session {
+	return c.GetFunc(sid)
 }
 
 type spyCache struct {
