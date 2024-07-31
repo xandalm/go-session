@@ -10,7 +10,7 @@ import (
 
 func TestSessionInit(t *testing.T) {
 
-	dummyStorage := newStubSessionStorage()
+	dummyStorage := newStubStorage()
 
 	t.Run("tell cache to add session", func(t *testing.T) {
 		cache := &spyCache{}
@@ -61,7 +61,7 @@ func TestSessionInit(t *testing.T) {
 
 func TestSessionRead(t *testing.T) {
 
-	dummyStorage := newStubSessionStorage()
+	dummyStorage := newStubStorage()
 
 	t.Run("tell cache to get session", func(t *testing.T) {
 		cache := &spyCache{}
@@ -119,9 +119,13 @@ func TestSessionRead(t *testing.T) {
 func TestSessionDestroy(t *testing.T) {
 
 	session := newStubSession("17af454")
-	storage := &stubSessionStorage{
-		Sessions: map[string]Session{
-			session.SessionID(): session,
+	registry := &stubRegistry{
+		session.SessionID(),
+		map[string]any{},
+	}
+	storage := &stubStorage{
+		data: map[string]Registry{
+			registry.id: registry,
 		},
 	}
 	cache := stubCache{
@@ -142,7 +146,7 @@ func TestSessionDestroy(t *testing.T) {
 		if _, ok := cache[sid]; ok {
 			t.Fatalf("didn't remove session from cache")
 		}
-		if _, ok := storage.Sessions[sid]; ok {
+		if _, ok := storage.data[sid]; ok {
 			t.Errorf("didn't remove session from storage")
 		}
 	})
@@ -151,8 +155,8 @@ func TestSessionDestroy(t *testing.T) {
 func TestSessionGC(t *testing.T) {
 
 	t.Run("destroy sessions that arrives max age", func(t *testing.T) {
-		storage := &stubSessionStorage{
-			Sessions: map[string]Session{},
+		storage := &stubStorage{
+			data: map[string]Registry{},
 		}
 
 		type cache struct {

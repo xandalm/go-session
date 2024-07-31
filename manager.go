@@ -17,10 +17,16 @@ type Session interface {
 	Delete(string) error
 }
 
+type Registry interface {
+	Id() string
+	Set(k string, v any)
+	Delete(k string)
+}
+
 type Storage interface {
-	Save(Session) error
-	Load(sid string) (Session, error)
-	Delete(sid string) error
+	Save(Registry) error
+	Load(id string) (Registry, error)
+	Delete(id string) error
 }
 
 type Provider interface {
@@ -202,4 +208,12 @@ func Reset(cookieName string, maxAge int64, adapter AgeCheckerAdapter, storage S
 		maxAge,
 		adapter,
 	)
+}
+
+func Start(w http.ResponseWriter, r *http.Request) Session {
+	return manager.StartSession(w, r)
+}
+
+func Destroy(w http.ResponseWriter, r *http.Request) {
+	manager.DestroySession(w, r)
 }
