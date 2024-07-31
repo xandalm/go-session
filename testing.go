@@ -95,42 +95,42 @@ func (p *stubFailingProvider) SessionDestroy(sid string) error {
 
 func (p *stubFailingProvider) SessionGC(checker AgeChecker) {}
 
-type stubRegistry struct {
+type stubStorageItem struct {
 	id     string
 	values map[string]any
 }
 
-func (r *stubRegistry) Id() string {
+func (r *stubStorageItem) Id() string {
 	return r.id
 }
 
-func (r *stubRegistry) Set(k string, v any) {
+func (r *stubStorageItem) Set(k string, v any) {
 	r.values[k] = v
 }
 
-func (r *stubRegistry) Delete(k string) {
+func (r *stubStorageItem) Delete(k string) {
 	delete(r.values, k)
 }
 
 type stubStorage struct {
 	mu   sync.Mutex
-	data map[string]Registry
+	data map[string]StorageItem
 }
 
 func newStubStorage() *stubStorage {
 	return &stubStorage{
-		data: make(map[string]Registry),
+		data: make(map[string]StorageItem),
 	}
 }
 
-func (ss *stubStorage) Save(r Registry) error {
+func (ss *stubStorage) Save(r StorageItem) error {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 	ss.data[r.Id()] = r
 	return nil
 }
 
-func (ss *stubStorage) Load(id string) (Registry, error) {
+func (ss *stubStorage) Load(id string) (StorageItem, error) {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 	if sess, ok := ss.data[id]; ok {
@@ -152,12 +152,12 @@ type spyStorage struct {
 	callsToDelete int
 }
 
-func (ss *spyStorage) Save(r Registry) error {
+func (ss *spyStorage) Save(r StorageItem) error {
 	ss.callsToSave++
 	return nil
 }
 
-func (ss *spyStorage) Load(id string) (Registry, error) {
+func (ss *spyStorage) Load(id string) (StorageItem, error) {
 	ss.callsToLoad++
 	return nil, nil
 }
@@ -172,11 +172,11 @@ var errFoo error = errors.New("foo error")
 type stubFailingStorage struct {
 }
 
-func (s *stubFailingStorage) Save(r Registry) error {
+func (s *stubFailingStorage) Save(r StorageItem) error {
 	return errFoo
 }
 
-func (s *stubFailingStorage) Load(id string) (Registry, error) {
+func (s *stubFailingStorage) Load(id string) (StorageItem, error) {
 	return nil, errFoo
 }
 
@@ -185,16 +185,16 @@ func (s *stubFailingStorage) Delete(id string) error {
 }
 
 type mockStorage struct {
-	SaveFunc   func(Registry) error
-	LoadFunc   func(string) (Registry, error)
+	SaveFunc   func(StorageItem) error
+	LoadFunc   func(string) (StorageItem, error)
 	DeleteFunc func(string) error
 }
 
-func (s *mockStorage) Save(r Registry) error {
+func (s *mockStorage) Save(r StorageItem) error {
 	return s.SaveFunc(r)
 }
 
-func (s *mockStorage) Load(id string) (Registry, error) {
+func (s *mockStorage) Load(id string) (StorageItem, error) {
 	return s.LoadFunc(id)
 }
 

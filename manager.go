@@ -17,15 +17,15 @@ type Session interface {
 	Delete(string) error
 }
 
-type Registry interface {
+type StorageItem interface {
 	Id() string
 	Set(k string, v any)
 	Delete(k string)
 }
 
 type Storage interface {
-	Save(Registry) error
-	Load(id string) (Registry, error)
+	Save(StorageItem) error
+	Load(id string) (StorageItem, error)
 	Delete(id string) error
 }
 

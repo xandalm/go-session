@@ -119,12 +119,12 @@ func TestSessionRead(t *testing.T) {
 func TestSessionDestroy(t *testing.T) {
 
 	session := newStubSession("17af454")
-	registry := &stubRegistry{
+	registry := &stubStorageItem{
 		session.SessionID(),
 		map[string]any{},
 	}
 	storage := &stubStorage{
-		data: map[string]Registry{
+		data: map[string]StorageItem{
 			registry.id: registry,
 		},
 	}
@@ -156,7 +156,7 @@ func TestSessionGC(t *testing.T) {
 
 	t.Run("destroy sessions that arrives max age", func(t *testing.T) {
 		storage := &stubStorage{
-			data: map[string]Registry{},
+			data: map[string]StorageItem{},
 		}
 
 		type cache struct {
