@@ -33,8 +33,9 @@ func TestSessionInit(t *testing.T) {
 		}
 	})
 
+	cache := stubCache{}
 	provider := &defaultProvider{
-		cached:            newCache(),
+		cached:            cache,
 		storage:           dummyStorage,
 		ageCheckerAdapter: dummyAdapter,
 	}
@@ -46,6 +47,10 @@ func TestSessionInit(t *testing.T) {
 
 		assert.Nil(t, err)
 		assert.NotNil(t, sess)
+
+		if _, ok := cache[sid]; !ok {
+			t.Error("didn't add session into cache")
+		}
 	})
 	t.Run("returns error for empty sid", func(t *testing.T) {
 
@@ -102,7 +107,7 @@ func TestSessionRead(t *testing.T) {
 			t.Errorf("didn't get expected session, got %s but want %s", session.SessionID(), sid)
 		}
 	})
-	t.Run("start new session if has no session to read", func(t *testing.T) {
+	t.Run("init session if has no session to read", func(t *testing.T) {
 		sid := "17af450"
 		session, err := provider.SessionRead(sid)
 
@@ -110,7 +115,11 @@ func TestSessionRead(t *testing.T) {
 		assert.NotNil(t, session)
 
 		if session.SessionID() != sid {
-			t.Errorf("didn't get expected session, got %s but want %s", session.SessionID(), sid)
+			t.Fatalf("didn't get expected session, got %s but want %s", session.SessionID(), sid)
+		}
+
+		if _, ok := cache[sid]; !ok {
+			t.Error("didn't add session into cache")
 		}
 	})
 }
