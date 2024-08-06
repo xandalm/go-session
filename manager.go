@@ -21,18 +21,25 @@ type StorageItem interface {
 	Id() string
 	Set(k string, v any)
 	Delete(k string)
+	Values() map[string]any
 }
 
 type Storage interface {
-	Save(StorageItem) error
-	Load(id string) (StorageItem, error)
+	Save(Session) error
+	Load(id string) (Session, error)
 	Delete(id string) error
+}
+
+type SessionConverter interface {
+	FromStorageItem(StorageItem) Session
+	ToStorageItem(Session) StorageItem
 }
 
 type Provider interface {
 	SessionInit(sid string) (Session, error)
 	SessionRead(sid string) (Session, error)
 	SessionDestroy(sid string) error
+	SessionSync(Session) error
 	SessionGC(checker AgeChecker)
 }
 
@@ -52,46 +59,6 @@ func (ma secondsAgeChecker) ShouldReap(t time.Time) bool {
 var SecondsAgeCheckerAdapter AgeCheckerAdapter = func(maxAge int64) AgeChecker {
 	return secondsAgeChecker(maxAge)
 }
-
-/*
-
-pkg session
-
-interface Storage {
-	Save(Session)
-	Load(sid)
-	Delete(sid)
-}
-
-interface Provider {
-	Init(sid)
-	Read(sid)
-	Destroy(sid)
-	GC(maxAge)
-	Storage()
-}
-
-s := NewStorage()
-p := NewProvider(s)
-
-session.SetProvider(p) // _p.Erase(); _p = p
-
-session.Start(w, r)
-session.Destroy(w, r)
-session.GC()
-
----------
-
-sess := session.Start(w, r)
-
-sess.ID()
-sess.Set(k, v)
-sess.Get(k)
-sess.Delete(k)
-
-after request ctx done => p.Storage().Save(sess)
-
-*/
 
 // Manager allows to work with sessions.
 //

@@ -127,7 +127,10 @@ func newProvider(storage Storage) *provider {
 		panic("nil storage")
 	}
 	return &provider{
-		cached:  &cache{},
+		cached: &cache{
+			list.New(),
+			[]*cacheNode{},
+		},
 		storage: storage,
 	}
 }
@@ -164,6 +167,7 @@ func (p *provider) sessionInit(sid string) (Session, error) {
 		return nil, ErrDuplicatedSessionId
 	}
 	sess := &session{
+		p,
 		sid,
 		make(map[string]any),
 		time.Now(),
@@ -196,6 +200,10 @@ func (p *provider) SessionDestroy(sid string) error {
 	p.cached.Remove(sid)
 	p.storage.Delete(sid)
 	return nil
+}
+
+func (p *provider) SessionSync(sess Session) error {
+	panic("not implemented")
 }
 
 // Checks for expired sessions through storage api, and remove them.

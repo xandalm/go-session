@@ -221,6 +221,7 @@ func TestCache_Add(t *testing.T) {
 			[]*cacheNode{},
 		}
 		s := &session{
+			nil,
 			"1",
 			map[string]any{},
 			time.Now(),
@@ -277,6 +278,7 @@ func TestCache_Add(t *testing.T) {
 		}
 
 		c.Add(&session{
+			nil,
 			"1",
 			map[string]any{},
 			time.Now(),

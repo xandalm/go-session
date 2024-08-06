@@ -6,6 +6,7 @@ import (
 )
 
 type session struct {
+	p  Provider
 	id string
 	v  map[string]any
 	ct time.Time
@@ -17,6 +18,7 @@ func (s *session) SessionID() string {
 }
 
 func (s *session) Get(key string) any {
+	s.p.SessionSync(s)
 	return s.v[key]
 }
 

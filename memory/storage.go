@@ -13,16 +13,20 @@ type StorageItem struct {
 	values map[string]any
 }
 
-func (r *StorageItem) Id() string {
-	return r.id
+func (i *StorageItem) Id() string {
+	return i.id
 }
 
-func (r *StorageItem) Set(k string, v any) {
-	r.values[k] = v
+func (i *StorageItem) Set(k string, v any) {
+	i.values[k] = v
 }
 
-func (r *StorageItem) Delete(k string) {
-	delete(r.values, k)
+func (i *StorageItem) Delete(k string) {
+	delete(i.values, k)
+}
+
+func (i *StorageItem) Values() map[string]any {
+	return i.values
 }
 
 type indexNode struct {

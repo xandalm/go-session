@@ -77,6 +77,10 @@ func (p *stubProvider) SessionDestroy(sid string) error {
 	return nil
 }
 
+func (p *stubProvider) SessionSync(sess Session) error {
+	return nil
+}
+
 func (p *stubProvider) SessionGC(checker AgeChecker) {}
 
 type stubFailingProvider struct{}
@@ -93,7 +97,71 @@ func (p *stubFailingProvider) SessionDestroy(sid string) error {
 	return errFoo
 }
 
+func (p *stubFailingProvider) SessionSync(sess Session) error {
+	return errFoo
+}
+
 func (p *stubFailingProvider) SessionGC(checker AgeChecker) {}
+
+type spyProvider struct {
+	callsToInit    int
+	callsToRead    int
+	callsToDestroy int
+	callsToSync    int
+	callsToGC      int
+}
+
+func (p *spyProvider) SessionInit(sid string) (Session, error) {
+	p.callsToInit++
+	return nil, nil
+}
+
+func (p *spyProvider) SessionRead(sid string) (Session, error) {
+	p.callsToRead++
+	return nil, nil
+}
+
+func (p *spyProvider) SessionDestroy(sid string) error {
+	p.callsToDestroy++
+	return nil
+}
+
+func (p *spyProvider) SessionSync(sess Session) error {
+	p.callsToSync++
+	return nil
+}
+
+func (p *spyProvider) SessionGC(checker AgeChecker) {
+	p.callsToGC++
+}
+
+type mockProvider struct {
+	SessionInitFunc    func(sid string) (Session, error)
+	SessionReadFunc    func(sid string) (Session, error)
+	SessionDestroyFunc func(sid string) error
+	SessionSyncFunc    func(sess Session) error
+	SessionGCFunc      func(checker AgeChecker)
+}
+
+func (p *mockProvider) SessionInit(sid string) (Session, error) {
+	return p.SessionInitFunc(sid)
+}
+
+func (p *mockProvider) SessionRead(sid string) (Session, error) {
+	return p.SessionReadFunc(sid)
+}
+
+func (p *mockProvider) SessionDestroy(sid string) error {
+	return p.SessionDestroyFunc(sid)
+}
+
+func (p *mockProvider) SessionSync(sess Session) error {
+	return p.SessionSyncFunc(sess)
+}
+
+func (p *mockProvider) SessionGC(checker AgeChecker) {
+	p.SessionGCFunc(checker)
+}
 
 type stubStorageItem struct {
 	id     string
@@ -112,8 +180,13 @@ func (r *stubStorageItem) Delete(k string) {
 	delete(r.values, k)
 }
 
+func (r *stubStorageItem) Values() map[string]any {
+	return maps.Clone(r.values)
+}
+
 type stubStorage struct {
 	mu   sync.Mutex
+	c    SessionConverter
 	data map[string]StorageItem
 }
 
@@ -123,18 +196,22 @@ func newStubStorage() *stubStorage {
 	}
 }
 
-func (ss *stubStorage) Save(r StorageItem) error {
+func (ss *stubStorage) Save(sess Session) error {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
-	ss.data[r.Id()] = r
+	if ss.data == nil {
+		ss.data = map[string]StorageItem{}
+	}
+	i := ss.c.ToStorageItem(sess)
+	ss.data[i.Id()] = i
 	return nil
 }
 
-func (ss *stubStorage) Load(id string) (StorageItem, error) {
+func (ss *stubStorage) Load(id string) (Session, error) {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
-	if sess, ok := ss.data[id]; ok {
-		return sess, nil
+	if i, ok := ss.data[id]; ok {
+		return ss.c.FromStorageItem(i), nil
 	}
 	return nil, nil
 }
@@ -152,12 +229,12 @@ type spyStorage struct {
 	callsToDelete int
 }
 
-func (ss *spyStorage) Save(r StorageItem) error {
+func (ss *spyStorage) Save(r Session) error {
 	ss.callsToSave++
 	return nil
 }
 
-func (ss *spyStorage) Load(id string) (StorageItem, error) {
+func (ss *spyStorage) Load(id string) (Session, error) {
 	ss.callsToLoad++
 	return nil, nil
 }
