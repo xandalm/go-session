@@ -2,15 +2,14 @@ package session
 
 import (
 	"reflect"
-	"time"
 )
 
 type session struct {
 	p  Provider
 	id string
 	v  map[string]any
-	ct time.Time
-	at time.Time
+	ct int64
+	at int64
 }
 
 func (s *session) SessionID() string {

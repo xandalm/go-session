@@ -9,14 +9,14 @@ import (
 
 type stubSession struct {
 	Id        string
-	CreatedAt time.Time
+	CreatedAt int64
 	V         map[string]any
 }
 
 func newStubSession(id string) *stubSession {
 	return &stubSession{
 		Id:        id,
-		CreatedAt: time.Now(),
+		CreatedAt: time.Now().UnixNano(),
 		V:         map[string]any{},
 	}
 }
@@ -41,10 +41,6 @@ func (s *stubSession) values() map[string]any {
 
 func (s *stubSession) SessionID() string {
 	return s.Id
-}
-
-func (s *stubSession) CreationTime() time.Time {
-	return s.CreatedAt
 }
 
 type stubProvider struct {
@@ -280,8 +276,8 @@ func (s *mockStorage) Delete(id string) error {
 
 type stubMilliAgeChecker int64
 
-func (m stubMilliAgeChecker) ShouldReap(t time.Time) bool {
-	diff := time.Now().UnixMilli() - t.UnixMilli()
+func (m stubMilliAgeChecker) ShouldReap(t int64) bool {
+	diff := time.Now().UnixMilli() - (t / int64(time.Millisecond))
 	return diff > int64(m)
 }
 
@@ -372,4 +368,12 @@ func (c *spyCache) Remove(sid string) {
 func (c *spyCache) Get(sid string) Session {
 	c.callsToGet++
 	return nil
+}
+
+func NowTime() time.Time {
+	return time.Now()
+}
+
+func NowTimeNanoseconds() int64 {
+	return NowTime().UnixNano()
 }

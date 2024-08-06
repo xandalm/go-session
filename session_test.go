@@ -2,7 +2,6 @@ package session
 
 import (
 	"testing"
-	"time"
 
 	"github.com/xandalm/go-session/testing/assert"
 )
@@ -12,8 +11,8 @@ func TestSession_SessionID(t *testing.T) {
 		nil,
 		"abcde",
 		map[string]any{},
-		time.Now(),
-		time.Now(),
+		NowTimeNanoseconds(),
+		NowTimeNanoseconds(),
 	}
 
 	got := sess.SessionID()
@@ -31,8 +30,8 @@ func TestSession_Get(t *testing.T) {
 			dummyProvider,
 			"abcde",
 			map[string]any{"foo": "bar"},
-			time.Now(),
-			time.Now(),
+			NowTimeNanoseconds(),
+			NowTimeNanoseconds(),
 		}
 
 		got := sess.Get("foo")
@@ -62,8 +61,8 @@ func TestSession_Set(t *testing.T) {
 		nil,
 		"abcde",
 		map[string]any{},
-		time.Now(),
-		time.Now(),
+		NowTimeNanoseconds(),
+		NowTimeNanoseconds(),
 	}
 	key := "foo"
 	value := "bar"
@@ -86,8 +85,8 @@ func TestSession_Delete(t *testing.T) {
 		nil,
 		"abcde",
 		map[string]any{"foo": "bar"},
-		time.Now(),
-		time.Now(),
+		NowTimeNanoseconds(),
+		NowTimeNanoseconds(),
 	}
 
 	err := sess.Delete("foo")

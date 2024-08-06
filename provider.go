@@ -10,8 +10,8 @@ import (
 
 type sessionInfo struct {
 	sid string
-	ct  time.Time
-	at  time.Time
+	ct  int64
+	at  int64
 }
 
 type cacheNode struct {
@@ -168,12 +168,13 @@ func (p *provider) sessionInit(sid string) (Session, error) {
 	if p.cached.Contains(sid) {
 		return nil, ErrDuplicatedSessionId
 	}
+	now := time.Now().UnixNano()
 	sess := &session{
 		p,
 		sid,
 		make(map[string]any),
-		time.Now(),
-		time.Now(),
+		now,
+		now,
 	}
 	p.cached.Add(sess)
 	return sess, nil

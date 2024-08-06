@@ -43,15 +43,18 @@ type Provider interface {
 }
 
 type AgeChecker interface {
-	ShouldReap(time.Time) bool
+	// It says if the session is expired.
+	// The given value is the unix nanoseconds
+	// count until the session creation time.
+	ShouldReap(int64) bool
 }
 
 type AgeCheckerAdapter func(int64) AgeChecker
 
 type secondsAgeChecker int64
 
-func (ma secondsAgeChecker) ShouldReap(t time.Time) bool {
-	diff := time.Now().Unix() - t.Unix()
+func (ma secondsAgeChecker) ShouldReap(t int64) bool {
+	diff := time.Now().Unix() - (t / int64(time.Second))
 	return diff >= int64(ma)
 }
 

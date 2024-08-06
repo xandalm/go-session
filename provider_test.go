@@ -278,8 +278,8 @@ func TestCache_Add(t *testing.T) {
 			nil,
 			"1",
 			map[string]any{},
-			time.Now(),
-			time.Now(),
+			NowTimeNanoseconds(),
+			NowTimeNanoseconds(),
 		}
 
 		c.Add(s)
@@ -318,8 +318,8 @@ func TestCache_Add(t *testing.T) {
 		node := &cacheNode{
 			info: &sessionInfo{
 				"3",
-				time.Now(),
-				time.Now(),
+				NowTimeNanoseconds(),
+				NowTimeNanoseconds(),
 			},
 		}
 
@@ -335,8 +335,8 @@ func TestCache_Add(t *testing.T) {
 			nil,
 			"1",
 			map[string]any{},
-			time.Now(),
-			time.Now(),
+			NowTimeNanoseconds(),
+			NowTimeNanoseconds(),
 		})
 
 		if c.collec.Len() != 2 {
@@ -358,8 +358,8 @@ func TestCache_Contains(t *testing.T) {
 	node := &cacheNode{
 		info: &sessionInfo{
 			"1",
-			time.Now(),
-			time.Now(),
+			NowTimeNanoseconds(),
+			NowTimeNanoseconds(),
 		},
 	}
 
@@ -395,8 +395,8 @@ func TestCache_Remove(t *testing.T) {
 	node := &cacheNode{
 		info: &sessionInfo{
 			"1",
-			time.Now(),
-			time.Now(),
+			NowTimeNanoseconds(),
+			NowTimeNanoseconds(),
 		},
 	}
 
@@ -426,8 +426,8 @@ func TestCache_ExpiredSessions(t *testing.T) {
 	node1 := &cacheNode{
 		info: &sessionInfo{
 			"1",
-			time.Now(),
-			time.Now(),
+			NowTimeNanoseconds(),
+			NowTimeNanoseconds(),
 		},
 	}
 
@@ -436,8 +436,8 @@ func TestCache_ExpiredSessions(t *testing.T) {
 	node2 := &cacheNode{
 		info: &sessionInfo{
 			"2",
-			time.Now(),
-			time.Now(),
+			NowTimeNanoseconds(),
+			NowTimeNanoseconds(),
 		},
 	}
 
