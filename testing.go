@@ -35,8 +35,8 @@ func (s *stubSession) Delete(key string) error {
 	return nil
 }
 
-func (s *stubSession) Values() map[string]any {
-	return maps.Clone(s.V)
+func (s *stubSession) values() map[string]any {
+	return s.V
 }
 
 func (s *stubSession) SessionID() string {
@@ -186,7 +186,6 @@ func (r *stubStorageItem) Values() map[string]any {
 
 type stubStorage struct {
 	mu   sync.Mutex
-	c    SessionConverter
 	data map[string]StorageItem
 }
 
@@ -196,22 +195,22 @@ func newStubStorage() *stubStorage {
 	}
 }
 
-func (ss *stubStorage) Save(sess Session) error {
+func (ss *stubStorage) Save(sess Session, adapter Session2StorageItem) error {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 	if ss.data == nil {
 		ss.data = map[string]StorageItem{}
 	}
-	i := ss.c.ToStorageItem(sess)
+	i := adapter(sess)
 	ss.data[i.Id()] = i
 	return nil
 }
 
-func (ss *stubStorage) Load(id string) (Session, error) {
+func (ss *stubStorage) Load(id string, adapter StorageItem2Session) (Session, error) {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 	if i, ok := ss.data[id]; ok {
-		return ss.c.FromStorageItem(i), nil
+		return adapter(i), nil
 	}
 	return nil, nil
 }

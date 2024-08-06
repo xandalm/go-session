@@ -152,6 +152,60 @@ func TestSessionDestroy(t *testing.T) {
 	})
 }
 
+func TestSessionSync(t *testing.T) {
+	registry := &stubStorageItem{
+		"17af454",
+		map[string]any{"foo": "bar"},
+	}
+	storage := &stubStorage{
+		data: map[string]StorageItem{
+			registry.id: registry,
+		},
+	}
+	dummyCache := stubCache{}
+
+	provider := &provider{
+		cached:  dummyCache,
+		storage: storage,
+		s2i: func(s Session) StorageItem {
+			return &stubStorageItem{
+				s.SessionID(),
+				s.values(),
+			}
+		},
+		i2s: func(si StorageItem) Session {
+			return &stubSession{
+				Id: si.Id(),
+				V:  si.Values(),
+			}
+		},
+	}
+
+	t.Run("pull session data from storage", func(t *testing.T) {
+		session := newStubSession("17af454")
+		provider.SessionSync(session)
+
+		want := stubSession{
+			Id: registry.id,
+			V:  registry.values,
+		}
+
+		assert.Equal(t, session.Id, want.Id)
+		assert.Equal(t, session.V, want.V)
+	})
+
+	t.Run("push session data to storage", func(t *testing.T) {
+		session := newStubSession("17af454")
+		session.values()["key"] = "value"
+		provider.SessionSync(session)
+
+		got := storage.data[session.SessionID()].Values()
+		want := session.values()
+
+		assert.Equal(t, got, want)
+	})
+}
+
 func TestSessionGC(t *testing.T) {
 
 	t.Run("destroy sessions that arrives max age", func(t *testing.T) {

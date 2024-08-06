@@ -119,6 +119,8 @@ type provider struct {
 	mu      sync.Mutex
 	cached  cacheI
 	storage Storage
+	s2i     Session2StorageItem
+	i2s     StorageItem2Session
 }
 
 // Returns a new provider (address for pointer reference).
@@ -203,7 +205,15 @@ func (p *provider) SessionDestroy(sid string) error {
 }
 
 func (p *provider) SessionSync(sess Session) error {
-	panic("not implemented")
+	got, _ := p.storage.Load(sess.SessionID(), p.i2s)
+	for k, v := range sess.values() {
+		got.values()[k] = v
+	}
+	for k, v := range got.values() {
+		sess.values()[k] = v
+	}
+	p.storage.Save(sess, p.s2i)
+	return nil
 }
 
 // Checks for expired sessions through storage api, and remove them.

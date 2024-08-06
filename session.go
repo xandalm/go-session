@@ -64,3 +64,7 @@ func (s *session) Delete(key string) error {
 	delete(s.v, key)
 	return nil
 }
+
+func (s *session) values() map[string]any {
+	return s.v
+}
