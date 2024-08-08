@@ -103,7 +103,7 @@ func (s *storage) Load(id string) (map[string]any, error) {
 	if found == nil {
 		return nil, nil
 	}
-	return found.Value.(map[string]any), nil
+	return found.Value.(*StorageItem).values, nil
 }
 
 // Delete item from the storage.

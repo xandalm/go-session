@@ -23,14 +23,14 @@ func TestStorage_Save(t *testing.T) {
 
 		assert.NoError(t, err)
 
-		got := storage.items.Front().Value.(StorageItem)
+		got := storage.items.Front().Value.(*StorageItem)
 		want := StorageItem{
 			"abcde",
 			map[string]any{"foo": "bar baz"},
 		}
 
-		if !reflect.DeepEqual(got, want) {
-			t.Errorf("create %v, but want %v", got, want)
+		if !reflect.DeepEqual(*got, want) {
+			t.Errorf("create %v, but want %v", *got, want)
 		}
 	})
 	t.Run("panic on empty id", func(t *testing.T) {
@@ -59,8 +59,8 @@ func TestStorage_Load(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, got)
 
-	if !reflect.DeepEqual(item, got) {
-		t.Errorf("got %v, but want %v", got, item)
+	if !reflect.DeepEqual(item.values, got) {
+		t.Errorf("got %v, but want %v", got, item.values)
 	}
 }
 
