@@ -15,7 +15,6 @@ type Session interface {
 	Set(string, any) error
 	Get(string) any
 	Delete(string) error
-	values() map[string]any
 }
 
 type StorageItem interface {
@@ -26,13 +25,10 @@ type StorageItem interface {
 }
 
 type Storage interface {
-	Save(Session, Session2StorageItem) error
-	Load(id string, adapter StorageItem2Session) (Session, error)
-	Delete(id string) error
+	Save(string, map[string]any) error
+	Load(string) (map[string]any, error)
+	Delete(string) error
 }
-
-type Session2StorageItem func(Session) StorageItem
-type StorageItem2Session func(StorageItem) Session
 
 type Provider interface {
 	SessionInit(sid string) (Session, error)

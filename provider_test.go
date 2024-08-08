@@ -8,266 +8,6 @@ import (
 	"github.com/xandalm/go-session/testing/assert"
 )
 
-func TestSessionInit(t *testing.T) {
-
-	dummyStorage := newStubStorage()
-
-	t.Run("tell cache to add session", func(t *testing.T) {
-		cache := &spyCache{}
-
-		provider := &provider{
-			cached:  cache,
-			storage: dummyStorage,
-		}
-
-		_, err := provider.SessionInit("1")
-		assert.Nil(t, err)
-
-		if cache.callsToAdd == 0 {
-			t.Error("didn't tell cache to add")
-		}
-	})
-
-	cache := stubCache{}
-	provider := &provider{
-		cached:  cache,
-		storage: dummyStorage,
-	}
-
-	t.Run("init the session", func(t *testing.T) {
-
-		sid := "17af454"
-		sess, err := provider.SessionInit(sid)
-
-		assert.Nil(t, err)
-		assert.NotNil(t, sess)
-
-		if _, ok := cache[sid]; !ok {
-			t.Error("didn't add session into cache")
-		}
-	})
-	t.Run("returns error for empty sid", func(t *testing.T) {
-
-		_, err := provider.SessionInit("")
-
-		assert.Error(t, err, ErrEmptySessionId)
-	})
-	t.Run("returns error for duplicated sid", func(t *testing.T) {
-		_, err := provider.SessionInit("17af454")
-
-		assert.Error(t, err, ErrDuplicatedSessionId)
-	})
-}
-
-func TestSessionRead(t *testing.T) {
-
-	dummyStorage := newStubStorage()
-
-	t.Run("tell cache to get session", func(t *testing.T) {
-		cache := &spyCache{}
-
-		provider := &provider{
-			cached:  cache,
-			storage: dummyStorage,
-		}
-
-		_, err := provider.SessionRead("1")
-		assert.Nil(t, err)
-
-		if cache.callsToGet == 0 {
-			t.Error("didn't tell cache to get")
-		}
-	})
-
-	cache := stubCache{
-		"17af454": newStubSession("17af454"),
-	}
-
-	provider := &provider{
-		cached:  cache,
-		storage: dummyStorage,
-	}
-
-	t.Run("returns session", func(t *testing.T) {
-		sid := "17af454"
-		session, err := provider.SessionRead(sid)
-
-		assert.Nil(t, err)
-		assert.NotNil(t, session)
-
-		if session.SessionID() != sid {
-			t.Errorf("didn't get expected session, got %s but want %s", session.SessionID(), sid)
-		}
-	})
-	t.Run("init session if has no session to read", func(t *testing.T) {
-		sid := "17af450"
-		session, err := provider.SessionRead(sid)
-
-		assert.Nil(t, err)
-		assert.NotNil(t, session)
-
-		if session.SessionID() != sid {
-			t.Fatalf("didn't get expected session, got %s but want %s", session.SessionID(), sid)
-		}
-
-		if _, ok := cache[sid]; !ok {
-			t.Error("didn't add session into cache")
-		}
-	})
-}
-
-func TestSessionDestroy(t *testing.T) {
-
-	session := newStubSession("17af454")
-	registry := &stubStorageItem{
-		session.SessionID(),
-		map[string]any{},
-	}
-	storage := &stubStorage{
-		data: map[string]StorageItem{
-			registry.id: registry,
-		},
-	}
-	cache := stubCache{
-		session.SessionID(): session,
-	}
-
-	provider := &provider{
-		cached:  cache,
-		storage: storage,
-	}
-
-	t.Run("destroys session", func(t *testing.T) {
-		sid := "17af454"
-		err := provider.SessionDestroy(sid)
-
-		assert.Nil(t, err)
-
-		if _, ok := cache[sid]; ok {
-			t.Fatalf("didn't remove session from cache")
-		}
-		if _, ok := storage.data[sid]; ok {
-			t.Errorf("didn't remove session from storage")
-		}
-	})
-}
-
-func TestSessionSync(t *testing.T) {
-	registry := &stubStorageItem{
-		"17af454",
-		map[string]any{"foo": "bar"},
-	}
-	storage := &stubStorage{
-		data: map[string]StorageItem{
-			registry.id: registry,
-		},
-	}
-	dummyCache := stubCache{}
-
-	provider := &provider{
-		cached:  dummyCache,
-		storage: storage,
-		s2i: func(s Session) StorageItem {
-			return &stubStorageItem{
-				s.SessionID(),
-				s.values(),
-			}
-		},
-		i2s: func(si StorageItem) Session {
-			return &stubSession{
-				Id: si.Id(),
-				V:  si.Values(),
-			}
-		},
-	}
-
-	t.Run("pull session data from storage", func(t *testing.T) {
-		session := newStubSession("17af454")
-		provider.SessionSync(session)
-
-		want := stubSession{
-			Id: registry.id,
-			V:  registry.values,
-		}
-
-		assert.Equal(t, session.Id, want.Id)
-		assert.Equal(t, session.V, want.V)
-	})
-
-	t.Run("push session data to storage", func(t *testing.T) {
-		session := newStubSession("17af454")
-		session.values()["key"] = "value"
-		provider.SessionSync(session)
-
-		got := storage.data[session.SessionID()].Values()
-		want := session.values()
-
-		assert.Equal(t, got, want)
-	})
-}
-
-func TestSessionGC(t *testing.T) {
-
-	t.Run("destroy sessions that arrives max age", func(t *testing.T) {
-		storage := &stubStorage{
-			data: map[string]StorageItem{},
-		}
-
-		type cache struct {
-			data map[string]Session
-			mockCache
-		}
-
-		c := &cache{
-			data: map[string]Session{},
-		}
-		c.AddFunc = func(s Session) {
-			c.data[s.SessionID()] = s
-		}
-		c.ContainsFunc = func(s string) bool {
-			_, ok := c.data[s]
-			return ok
-		}
-		c.RemoveFunc = func(s string) {
-			delete(c.data, s)
-		}
-		c.ExpiredSessionsFunc = func(ac AgeChecker) []string {
-			ret := []string{}
-			for k, v := range c.data {
-				if ac.ShouldReap(v.(*session).ct) {
-					delete(c.data, k)
-					ret = append(ret, k)
-				}
-			}
-			return ret
-		}
-
-		provider := &provider{
-			cached:  c,
-			storage: storage,
-		}
-
-		sid1 := "17af450"
-		sid2 := "17af454"
-
-		provider.SessionInit(sid1)
-
-		time.Sleep(3 * time.Millisecond)
-
-		provider.SessionInit(sid2)
-
-		provider.SessionGC(stubMilliAgeChecker(1))
-
-		if provider.cached.Contains(sid1) {
-			t.Fatal("didn't destroy session")
-		}
-
-		if _, ok := provider.cached.(*cache).data[sid2]; !ok {
-			t.Errorf("expected that the session %s is in the storage", sid2)
-		}
-	})
-}
-
 func TestCache_Add(t *testing.T) {
 	t.Run("add session", func(t *testing.T) {
 		c := &cache{
@@ -469,6 +209,247 @@ func TestCache_ExpiredSessions(t *testing.T) {
 
 		if !c.Contains("2") {
 			t.Error("second session should not be removed")
+		}
+	})
+}
+
+func TestSessionInit(t *testing.T) {
+
+	dummyStorage := newStubStorage()
+
+	cache := &cache{
+		list.New(),
+		[]*cacheNode{},
+	}
+	provider := &provider{
+		cached:  cache,
+		storage: dummyStorage,
+	}
+
+	t.Run("init the session", func(t *testing.T) {
+
+		sid := "17af454"
+		sess, err := provider.SessionInit(sid)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, sess)
+
+		assert.NotNil(t, cache.Get(sid), "didn't add session into cache")
+	})
+	t.Run("returns error for empty sid", func(t *testing.T) {
+
+		_, err := provider.SessionInit("")
+
+		assert.Equal(t, err, ErrEmptySessionId)
+	})
+	t.Run("returns error for duplicated sid", func(t *testing.T) {
+		_, err := provider.SessionInit("17af454")
+
+		assert.Equal(t, err, ErrDuplicatedSessionId)
+	})
+}
+
+func TestSessionRead(t *testing.T) {
+
+	dummyStorage := newStubStorage()
+
+	cache := &cache{
+		list.New(),
+		[]*cacheNode{},
+	}
+
+	provider := &provider{
+		cached:  cache,
+		storage: dummyStorage,
+	}
+
+	sess := &session{
+		p:  provider,
+		id: "17af454",
+		v:  map[string]any{},
+		ct: time.Now().UnixNano(),
+		at: time.Now().UnixNano(),
+	}
+
+	cache.Add(sess)
+
+	t.Run("returns session", func(t *testing.T) {
+		sid := "17af454"
+		got, err := provider.SessionRead(sid)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, got)
+
+		assert.Equal(t, *got.(*session), *sess, "didn't get expected session, got %#v but want %#v", *got.(*session), *sess)
+	})
+
+	t.Run("init session if has no session to read", func(t *testing.T) {
+		sid := "17af450"
+		got, err := provider.SessionRead(sid)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, got)
+
+		sess := got.(*session)
+		if sess.id != sid {
+			t.Fatalf("didn't get expected session, got %s but want %s", sess.id, sid)
+		}
+
+		assert.NotNil(t, cache.Get(sid), "didn't add session into cache")
+	})
+}
+
+func TestSessionDestroy(t *testing.T) {
+
+	provider := &provider{}
+
+	sess := &session{
+		p:  provider,
+		id: "17af454",
+		v:  map[string]any{},
+	}
+	storage := &stubStorage{
+		data: map[string]map[string]any{
+			"17af454": {},
+		},
+	}
+
+	cache := &cache{
+		list.New(),
+		[]*cacheNode{},
+	}
+	cache.Add(sess)
+
+	provider.cached = cache
+	provider.storage = storage
+
+	t.Run("destroys session", func(t *testing.T) {
+		sid := "17af454"
+		err := provider.SessionDestroy(sid)
+
+		assert.NoError(t, err)
+
+		got := cache.Get(sid)
+
+		assert.Nil(t, got, "didn't remove session from cache")
+
+		if _, ok := storage.data[sid]; ok {
+			t.Errorf("didn't remove session from storage")
+		}
+	})
+}
+
+func TestSessionSync(t *testing.T) {
+
+	sid := "17af454"
+	svalues := map[string]any{
+		"foo": "bar",
+	}
+
+	storage := &stubStorage{
+		data: map[string]map[string]any{
+			sid: svalues,
+		},
+	}
+	dummyCache := &cache{
+		list.New(),
+		[]*cacheNode{},
+	}
+
+	provider := &provider{
+		cached:  dummyCache,
+		storage: storage,
+	}
+
+	t.Run("pull session data from storage", func(t *testing.T) {
+		sess := &session{
+			p:  provider,
+			id: "17af454",
+			v:  map[string]any{},
+		}
+		provider.SessionSync(sess)
+
+		want := session{
+			p:  provider,
+			id: "17af454",
+			v:  map[string]any{"foo": "bar"},
+		}
+
+		assert.Equal(t, *sess, want)
+	})
+
+	t.Run("push session data to storage too", func(t *testing.T) {
+		sess := &session{
+			p:  provider,
+			id: "17af454",
+			v:  map[string]any{},
+		}
+		sess.v["key"] = "value"
+		provider.SessionSync(sess)
+
+		got := storage.data[sess.id]
+		want := sess.v
+
+		assert.Equal(t, got, want)
+	})
+}
+
+func TestSessionGC(t *testing.T) {
+
+	t.Run("destroy sessions that arrives max age", func(t *testing.T) {
+		storage := &stubStorage{
+			data: map[string]map[string]any{},
+		}
+
+		cache := &cache{
+			list.New(),
+			[]*cacheNode{},
+		}
+
+		provider := &provider{
+			cached:  cache,
+			storage: storage,
+		}
+
+		sid1 := "17af450"
+		sid2 := "17af454"
+
+		now := time.Now().UnixNano()
+
+		cache.Add(&session{
+			provider,
+			sid1,
+			map[string]any{},
+			now - int64(3*time.Millisecond),
+			now - int64(3*time.Millisecond),
+		})
+		storage.data[sid1] = map[string]any{}
+
+		cache.Add(&session{
+			provider,
+			sid2,
+			map[string]any{},
+			now,
+			now,
+		})
+		storage.data[sid2] = map[string]any{}
+
+		provider.SessionGC(stubMilliAgeChecker(1))
+
+		if cache.Contains(sid1) {
+			t.Fatal("didn't destroy session from cache")
+		}
+
+		if _, ok := storage.data[sid1]; ok {
+			t.Fatal("didn't destroy session from storage")
+		}
+
+		if !cache.Contains(sid2) {
+			t.Fatalf("expected that the session %s is in the cache", sid2)
+		}
+
+		if _, ok := storage.data[sid2]; !ok {
+			t.Errorf("expected that the session %s is in the storage", sid2)
 		}
 	})
 }

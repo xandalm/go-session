@@ -16,23 +16,38 @@ func output(common string, out []any) string {
 	panic("output argument must be a fmt string")
 }
 
+func isNil(v any) bool {
+	if v == nil {
+		return true
+	}
+
+	val := reflect.ValueOf(v)
+	switch val.Kind() {
+	case reflect.Chan, reflect.Func,
+		reflect.Interface, reflect.Pointer, reflect.UnsafePointer,
+		reflect.Map, reflect.Slice:
+		return val.IsNil()
+	default:
+		return false
+	}
+}
+
 func NotNil(t testing.TB, v any, out ...any) {
 	t.Helper()
-	if v == nil {
+	if isNil(v) {
 		t.Fatal(output("expected not nil value", out))
 	}
 }
 
 func Nil(t testing.TB, v any, out ...any) {
 	t.Helper()
-
-	if v != nil {
+	if !isNil(v) {
 		t.Fatal(output("expected nil value", out))
 	}
 }
 
 func isEmpty(v any) bool {
-	if v == nil {
+	if isNil(v) {
 		return true
 	}
 
@@ -45,10 +60,7 @@ func isEmpty(v any) bool {
 		reflect.Slice,
 		reflect.String:
 		return value.Len() == 0
-	case reflect.Ptr:
-		if value.IsNil() {
-			return true
-		}
+	case reflect.Ptr, reflect.UnsafePointer:
 		return isEmpty(value.Elem().Interface())
 	default:
 		zero := reflect.Zero(value.Type())
@@ -83,23 +95,34 @@ func Equal[T any](t testing.TB, got, want T, out ...any) {
 	}
 }
 
-func NoError(t testing.TB, err, nwant error, out ...any) {
+func AnError(t testing.TB, err error, out ...any) {
 	t.Helper()
+	if err == nil {
+		t.Fatal(output("expected an error, but didn't get one", out))
+	}
+}
 
-	if err == nwant {
-		common := fmt.Sprintf("didn't want error %v, but got it", err)
-		t.Fatal(output(common, out))
+func NoError(t testing.TB, err error, out ...any) {
+	t.Helper()
+	if err != nil {
+		t.Fatal(output("expected no error but got one", out))
 	}
 }
 
 func Error(t testing.TB, got, want error, out ...any) {
 	t.Helper()
 
-	if got == nil {
-		t.Fatal(output("didn't get an error", out))
-	}
 	if got != want {
-		common := fmt.Sprintf("got error %v, but want %v", got, want)
+		common := fmt.Sprintf("expected error %v, but didn't get it", got)
+		t.Fatal(output(common, out))
+	}
+}
+
+func NotError(t testing.TB, got, nwant error, out ...any) {
+	t.Helper()
+
+	if got == nwant {
+		common := fmt.Sprintf("didn't expected error %v, but got it", got)
 		t.Fatal(output(common, out))
 	}
 }

@@ -45,17 +45,16 @@ func (c *cache) find(sid string) *cacheNode {
 	return nil
 }
 
-func (c *cache) Add(sess Session) {
-	s := sess.(*session)
+func (c *cache) Add(sess *session) {
 	node := &cacheNode{
 		&sessionInfo{
-			s.id,
-			s.ct,
-			s.at,
+			sess.id,
+			sess.ct,
+			sess.at,
 		}, 0, nil,
 	}
 	node.anchor = c.collec.PushBack(node)
-	node.sidIdxPos, _ = c.findIndex(s.id)
+	node.sidIdxPos, _ = c.findIndex(sess.id)
 	c.sidIdx = slices.Insert(c.sidIdx, node.sidIdxPos, node)
 }
 
@@ -95,10 +94,11 @@ func (c *cache) ExpiredSessions(checker AgeChecker) []string {
 	return ret
 }
 
-func (c *cache) Get(sid string) Session {
+func (c *cache) Get(sid string) *session {
 	if found := c.find(sid); found != nil {
 		return &session{
 			id: found.info.sid,
+			v:  map[string]any{},
 			ct: found.info.ct,
 			at: found.info.at,
 		}
@@ -107,11 +107,11 @@ func (c *cache) Get(sid string) Session {
 }
 
 type cacheI interface {
-	Add(sess Session)
+	Add(sess *session)
 	Contains(sid string) bool
 	ExpiredSessions(checker AgeChecker) []string
 	Remove(sid string)
-	Get(sid string) Session
+	Get(sid string) *session
 }
 
 // Provider that communicates with storage api to init, read and destroy sessions.
@@ -119,8 +119,6 @@ type provider struct {
 	mu      sync.Mutex
 	cached  cacheI
 	storage Storage
-	s2i     Session2StorageItem
-	i2s     StorageItem2Session
 }
 
 // Returns a new provider (address for pointer reference).
@@ -189,6 +187,7 @@ func (p *provider) SessionRead(sid string) (Session, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if sess := p.cached.Get(sid); sess != nil {
+		sess.p = p
 		return sess, nil
 	}
 	return p.sessionInit(sid)
@@ -206,14 +205,15 @@ func (p *provider) SessionDestroy(sid string) error {
 }
 
 func (p *provider) SessionSync(sess Session) error {
-	got, _ := p.storage.Load(sess.SessionID(), p.i2s)
-	for k, v := range sess.values() {
-		got.values()[k] = v
+	_sess := sess.(*session)
+	got, _ := p.storage.Load(_sess.id)
+	for k, v := range _sess.v {
+		got[k] = v
 	}
-	for k, v := range got.values() {
-		sess.values()[k] = v
+	for k, v := range got {
+		_sess.v[k] = v
 	}
-	p.storage.Save(sess, p.s2i)
+	p.storage.Save(_sess.id, _sess.v)
 	return nil
 }
 

@@ -69,7 +69,7 @@ func TestSession_Set(t *testing.T) {
 
 	err := sess.Set(key, value)
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	got, ok := sess.v[key]
 	if !ok {
@@ -91,7 +91,7 @@ func TestSession_Delete(t *testing.T) {
 
 	err := sess.Delete("foo")
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	if _, ok := sess.v["foo"]; ok {
 		t.Error("didn't delete value")

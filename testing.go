@@ -35,10 +35,6 @@ func (s *stubSession) Delete(key string) error {
 	return nil
 }
 
-func (s *stubSession) values() map[string]any {
-	return s.V
-}
-
 func (s *stubSession) SessionID() string {
 	return s.Id
 }
@@ -182,31 +178,30 @@ func (r *stubStorageItem) Values() map[string]any {
 
 type stubStorage struct {
 	mu   sync.Mutex
-	data map[string]StorageItem
+	data map[string]map[string]any
 }
 
 func newStubStorage() *stubStorage {
 	return &stubStorage{
-		data: make(map[string]StorageItem),
+		data: make(map[string]map[string]any),
 	}
 }
 
-func (ss *stubStorage) Save(sess Session, adapter Session2StorageItem) error {
+func (ss *stubStorage) Save(id string, values map[string]any) error {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 	if ss.data == nil {
-		ss.data = map[string]StorageItem{}
+		ss.data = map[string]map[string]any{}
 	}
-	i := adapter(sess)
-	ss.data[i.Id()] = i
+	ss.data[id] = values
 	return nil
 }
 
-func (ss *stubStorage) Load(id string, adapter StorageItem2Session) (Session, error) {
+func (ss *stubStorage) Load(id string) (map[string]any, error) {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
-	if i, ok := ss.data[id]; ok {
-		return adapter(i), nil
+	if v, ok := ss.data[id]; ok {
+		return v, nil
 	}
 	return nil, nil
 }
@@ -285,59 +280,33 @@ func stubMilliAgeCheckerAdapter(v int64) AgeChecker {
 	return stubMilliAgeChecker(v)
 }
 
-type stubCache map[string]Session
+// type mockCache struct {
+// 	AddFunc             func(Session)
+// 	ContainsFunc        func(string) bool
+// 	ExpiredSessionsFunc func(AgeChecker) []string
+// 	RemoveFunc          func(string)
+// 	GetFunc             func(string) Session
+// }
 
-func (c stubCache) Add(sess Session) {
-	c[sess.SessionID()] = sess
-}
+// func (c *mockCache) Add(sess Session) {
+// 	c.AddFunc(sess)
+// }
 
-func (c stubCache) Contains(sid string) bool {
-	_, ok := c[sid]
-	return ok
-}
+// func (c *mockCache) Contains(sid string) bool {
+// 	return c.ContainsFunc(sid)
+// }
 
-func (c stubCache) ExpiredSessions(checker AgeChecker) []string {
-	return nil
-}
+// func (c *mockCache) ExpiredSessions(checker AgeChecker) []string {
+// 	return c.ExpiredSessionsFunc(checker)
+// }
 
-func (c stubCache) Remove(sid string) {
-	delete(c, sid)
-}
+// func (c *mockCache) Remove(sid string) {
+// 	c.RemoveFunc(sid)
+// }
 
-func (c stubCache) Get(sid string) Session {
-	if g, ok := c[sid]; ok {
-		return g
-	}
-	return nil
-}
-
-type mockCache struct {
-	AddFunc             func(Session)
-	ContainsFunc        func(string) bool
-	ExpiredSessionsFunc func(AgeChecker) []string
-	RemoveFunc          func(string)
-	GetFunc             func(string) Session
-}
-
-func (c *mockCache) Add(sess Session) {
-	c.AddFunc(sess)
-}
-
-func (c *mockCache) Contains(sid string) bool {
-	return c.ContainsFunc(sid)
-}
-
-func (c *mockCache) ExpiredSessions(checker AgeChecker) []string {
-	return c.ExpiredSessionsFunc(checker)
-}
-
-func (c *mockCache) Remove(sid string) {
-	c.RemoveFunc(sid)
-}
-
-func (c *mockCache) Get(sid string) Session {
-	return c.GetFunc(sid)
-}
+// func (c *mockCache) Get(sid string) Session {
+// 	return c.GetFunc(sid)
+// }
 
 type spyCache struct {
 	callsToAdd             int

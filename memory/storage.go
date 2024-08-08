@@ -4,8 +4,6 @@ import (
 	"container/list"
 	"slices"
 	"sync"
-
-	"github.com/xandalm/go-session"
 )
 
 type StorageItem struct {
@@ -50,14 +48,11 @@ func NewStorage() *storage {
 }
 
 // Save item into storage.
-func (s *storage) Save(i session.StorageItem) error {
-	if i.Id() == "" {
+func (s *storage) Save(id string, values map[string]any) error {
+	if id == "" {
 		panic("empty id")
 	}
-	item, ok := i.(*StorageItem)
-	if !ok {
-		panic("unsupported type")
-	}
+	item := &StorageItem{id, values}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.save(item); err != nil {
@@ -89,10 +84,10 @@ func (s *storage) find(id string) *list.Element {
 func (s *storage) save(i *StorageItem) error {
 	pos, has := s.getPos(i.id)
 	if has {
-		s.idx[pos].anchor.Value = *i
+		s.idx[pos].anchor.Value = i
 		return nil
 	}
-	elem := s.items.PushFront(i.values)
+	elem := s.items.PushFront(i)
 	s.idx = slices.Insert(s.idx, pos, &indexNode{
 		&i.id,
 		elem,
@@ -101,17 +96,14 @@ func (s *storage) save(i *StorageItem) error {
 }
 
 // Returns the item or an error if can't read from the storage.
-func (s *storage) Load(id string) (session.StorageItem, error) {
+func (s *storage) Load(id string) (map[string]any, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	found := s.find(id)
 	if found == nil {
 		return nil, nil
 	}
-	return &StorageItem{
-		id,
-		found.Value.(map[string]any),
-	}, nil
+	return found.Value.(map[string]any), nil
 }
 
 // Delete item from the storage.
