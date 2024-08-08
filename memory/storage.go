@@ -101,7 +101,7 @@ func (s *storage) Load(id string) (map[string]any, error) {
 	defer s.mu.Unlock()
 	found := s.find(id)
 	if found == nil {
-		return nil, nil
+		return make(map[string]any), nil
 	}
 	return found.Value.(*StorageItem).values, nil
 }

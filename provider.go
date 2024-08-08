@@ -205,6 +205,8 @@ func (p *provider) SessionDestroy(sid string) error {
 }
 
 func (p *provider) SessionSync(sess Session) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	_sess := sess.(*session)
 	got, _ := p.storage.Load(_sess.id)
 	for k, v := range _sess.v {

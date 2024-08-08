@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"io"
@@ -131,10 +132,10 @@ func (m *Manager) StartSession(w http.ResponseWriter, r *http.Request) (session 
 	if err != nil || session == nil {
 		panic("unable to start the session")
 	}
-	// go func(ctx context.Context) {
-	// 	<-ctx.Done()
-	// 	fmt.Println("SAVE SESSION AT THIS TIME")
-	// }(r.Context())
+	go func(ctx context.Context) {
+		<-ctx.Done()
+		m.provider.SessionSync(session)
+	}(r.Context())
 	return
 }
 
