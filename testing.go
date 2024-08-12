@@ -197,7 +197,7 @@ func (ss *stubStorage) Save(id string, values map[string]any) error {
 	return nil
 }
 
-func (ss *stubStorage) Load(id string) (map[string]any, error) {
+func (ss *stubStorage) Read(id string) (map[string]any, error) {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 	if v, ok := ss.data[id]; ok {

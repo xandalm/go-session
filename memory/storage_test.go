@@ -45,7 +45,7 @@ func TestStorage_Save(t *testing.T) {
 	})
 }
 
-func TestStorage_Load(t *testing.T) {
+func TestStorage_Read(t *testing.T) {
 	id := "abcde"
 	item := &StorageItem{"abcde", map[string]any{}}
 	storage := NewStorage()
@@ -54,7 +54,7 @@ func TestStorage_Load(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotEmpty(t, storage.items)
 
-	got, err := storage.Load(id)
+	got, err := storage.Read(id)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, got)

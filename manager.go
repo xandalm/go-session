@@ -27,7 +27,7 @@ type StorageItem interface {
 
 type Storage interface {
 	Save(string, map[string]any) error
-	Load(string) (map[string]any, error)
+	Read(string) (map[string]any, error)
 	Delete(string) error
 }
 

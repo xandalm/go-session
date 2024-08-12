@@ -96,7 +96,7 @@ func (s *storage) save(i *StorageItem) error {
 }
 
 // Returns the item or an error if can't read from the storage.
-func (s *storage) Load(id string) (map[string]any, error) {
+func (s *storage) Read(id string) (map[string]any, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	found := s.find(id)

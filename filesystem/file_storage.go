@@ -275,6 +275,21 @@ func (s *storage) Save(id string, values map[string]any) error {
 	return nil
 }
 
+func (s *storage) Read(id string) (map[string]any, error) {
+	data := make(map[string]any)
+	file, err := os.Open(filepath.Join(s.path, s.prefix+id))
+	if err != nil {
+		return data, err
+	}
+	defer file.Close()
+
+	dec := gob.NewDecoder(file)
+	if err := dec.Decode(&data); err != nil {
+		return data, err
+	}
+	return data, nil
+}
+
 // // Returns a session or an error if cannot creates a session and it's file.
 // func (s *storage) CreateSession(sid string) (sessionpkg.Session, error) {
 // 	s.mu.Lock()

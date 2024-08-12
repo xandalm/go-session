@@ -504,3 +504,30 @@ func TestStorage_Save(t *testing.T) {
 		}
 	})
 }
+
+func TestStorage_Load(t *testing.T) {
+	path := "session_storage_test"
+	prefix := "gosess_"
+
+	id := "abcde"
+	values := map[string]any{
+		"foo": "bar",
+		"int": 1,
+	}
+
+	storage := NewStorage(path, prefix)
+	storage.Save(id, values)
+
+	data, err := storage.Read(id)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, data)
+
+	assert.Equal(t, data, values)
+
+	t.Cleanup(func() {
+		if err := os.RemoveAll(storage.path); err != nil {
+			log.Fatalf("cannot clean up after test, %v", err)
+		}
+	})
+}

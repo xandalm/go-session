@@ -208,7 +208,7 @@ func (p *provider) SessionSync(sess Session) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	_sess := sess.(*session)
-	got, _ := p.storage.Load(_sess.id)
+	got, _ := p.storage.Read(_sess.id)
 	for k, v := range _sess.v {
 		got[k] = v
 	}
