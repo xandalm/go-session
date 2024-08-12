@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/xandalm/go-session/testing/assert"
@@ -524,6 +525,39 @@ func TestStorage_Load(t *testing.T) {
 	assert.NotNil(t, data)
 
 	assert.Equal(t, data, values)
+
+	t.Cleanup(func() {
+		if err := os.RemoveAll(storage.path); err != nil {
+			log.Fatalf("cannot clean up after test, %v", err)
+		}
+	})
+}
+
+func TestStorage_List(t *testing.T) {
+	path := "session_storage_test"
+	prefix := "gosess_"
+
+	id1 := "abcde"
+	id2 := "fghij"
+
+	storage := NewStorage(path, prefix)
+	storage.Save(id1, map[string]any{})
+	storage.Save(id2, map[string]any{})
+
+	got, err := storage.List()
+
+	assert.NoError(t, err)
+
+	if len(got) == 0 {
+		t.Fatal("didn't get any name")
+	}
+
+	want1 := storage.prefix + id1
+	want2 := storage.prefix + id2
+
+	if !slices.Contains(got, want1) || !slices.Contains(got, want2) {
+		t.Errorf("unexpected result, %s and %s must be in %v", want1, want2, got)
+	}
 
 	t.Cleanup(func() {
 		if err := os.RemoveAll(storage.path); err != nil {

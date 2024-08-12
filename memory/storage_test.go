@@ -2,6 +2,7 @@ package memory
 
 import (
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/xandalm/go-session/testing/assert"
@@ -61,6 +62,29 @@ func TestStorage_Read(t *testing.T) {
 
 	if !reflect.DeepEqual(item.values, got) {
 		t.Errorf("got %v, but want %v", got, item.values)
+	}
+}
+
+func TestStorage_List(t *testing.T) {
+	id1 := "abcde"
+	id2 := "fghij"
+	storage := NewStorage()
+
+	assert.NoError(t, storage.save(&StorageItem{id1, map[string]any{}}))
+	assert.NoError(t, storage.save(&StorageItem{id2, map[string]any{}}))
+	assert.NotEmpty(t, storage.items)
+
+	got, err := storage.List()
+
+	assert.NoError(t, err)
+	assert.NotNil(t, got)
+
+	if len(got) == 0 {
+		t.Fatal("didn't get any name")
+	}
+
+	if !slices.Contains(got, id1) || !slices.Contains(got, id2) {
+		t.Errorf("unexpected result, %s and %s must be in %v", id1, id2, got)
 	}
 }
 

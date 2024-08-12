@@ -206,6 +206,16 @@ func (ss *stubStorage) Read(id string) (map[string]any, error) {
 	return nil, nil
 }
 
+func (ss *stubStorage) List() ([]string, error) {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
+	ret := []string{}
+	for k, _ := range ss.data {
+		ret = append(ret, k)
+	}
+	return ret, nil
+}
+
 func (ss *stubStorage) Delete(id string) error {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()

@@ -275,6 +275,15 @@ func (s *storage) Save(id string, values map[string]any) error {
 	return nil
 }
 
+func (s *storage) List() ([]string, error) {
+	ret := []string{}
+	entries, _ := os.ReadDir(s.path)
+	for _, e := range entries {
+		ret = append(ret, e.Name())
+	}
+	return ret, nil
+}
+
 func (s *storage) Read(id string) (map[string]any, error) {
 	data := make(map[string]any)
 	file, err := os.Open(filepath.Join(s.path, s.prefix+id))

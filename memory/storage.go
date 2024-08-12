@@ -106,6 +106,16 @@ func (s *storage) Read(id string) (map[string]any, error) {
 	return found.Value.(*StorageItem).values, nil
 }
 
+func (s *storage) List() ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ret := []string{}
+	for _, node := range s.idx {
+		ret = append(ret, *node.id)
+	}
+	return ret, nil
+}
+
 // Delete item from the storage.
 func (s *storage) Delete(id string) error {
 	s.mu.Lock()
