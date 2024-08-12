@@ -290,6 +290,14 @@ func (s *storage) Read(id string) (map[string]any, error) {
 	return data, nil
 }
 
+func (s *storage) Delete(id string) error {
+	err := os.Remove(filepath.Join(s.path, s.prefix+id))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // // Returns a session or an error if cannot creates a session and it's file.
 // func (s *storage) CreateSession(sid string) (sessionpkg.Session, error) {
 // 	s.mu.Lock()

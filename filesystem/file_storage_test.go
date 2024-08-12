@@ -531,3 +531,33 @@ func TestStorage_Load(t *testing.T) {
 		}
 	})
 }
+
+func TestStorage_Delete(t *testing.T) {
+	path := "session_storage_test"
+	prefix := "gosess_"
+
+	id := "abcde"
+	values := map[string]any{
+		"foo": "bar",
+		"int": 1,
+	}
+
+	storage := NewStorage(path, prefix)
+	storage.Save(id, values)
+
+	err := storage.Delete(id)
+
+	assert.NoError(t, err)
+
+	file, err := os.Open(filepath.Join(storage.path, fmt.Sprintf("%s%s", prefix, id)))
+	if err == nil {
+		file.Close()
+		t.Error("the file still exists")
+	}
+
+	t.Cleanup(func() {
+		if err := os.RemoveAll(storage.path); err != nil {
+			log.Fatalf("cannot clean up after test, %v", err)
+		}
+	})
+}
