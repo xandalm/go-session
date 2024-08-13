@@ -4,15 +4,18 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/xandalm/go-session"
+	"github.com/xandalm/go-session/filesystem"
 	"github.com/xandalm/go-session/memory"
 )
 
@@ -367,16 +370,19 @@ func TestSessionsWithMemoryStorage(t *testing.T) {
 	performTest(t)
 }
 
-// func TestSessionsWithFileSystemStorage(t *testing.T) {
-// 	path := "sessions_from_integration_test"
-// 	provider := session.NewProvider(filesystem.Storage(path), session.SecondsAgeCheckerAdapter)
-// 	manager := session.NewManager(provider, "SESSION_ID", 1)
+func TestSessionsWithFileSystemStorage(t *testing.T) {
+	path := "sessions_from_integration_test"
+	session.Reset("SESSION_ID", 1, session.SecondsAgeCheckerAdapter, filesystem.NewStorage(path, ""))
 
-// 	performTest(t, manager)
+	performTest(t)
 
-// 	t.Cleanup(func() {
-// 		if err := os.RemoveAll(path); err != nil {
-// 			log.Fatalf("cannot clean up after test, %v", err)
-// 		}
-// 	})
-// }
+	t.Cleanup(func() {
+		// suspected that the wait for the request context to be done
+		// (at manager.StartSession) is causing concurrence error during the test
+		time.Sleep(1 * time.Second)
+
+		if err := os.RemoveAll(path); err != nil {
+			log.Fatalf("cannot clean up after test, %v", err)
+		}
+	})
+}

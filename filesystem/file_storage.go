@@ -215,7 +215,7 @@ type storage struct {
 
 func NewStorage(path, prefix string /* io storageIO */) *storage {
 	err := os.MkdirAll(path, 0750)
-	if err != nil {
+	if err != nil && !os.IsExist(err) {
 		panic(fmt.Sprintf("cannot make sessions storage folder, %v", err))
 	}
 	s := &storage{

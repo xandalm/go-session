@@ -493,10 +493,11 @@ func TestStorage_Save(t *testing.T) {
 		assert.NoError(t, err)
 
 		file, err := os.Open(filepath.Join(storage.path, fmt.Sprintf("%s%s", prefix, id)))
-		if err != nil {
-			t.Error("cannot open session file (was the file created?)")
+		if err == nil {
+			file.Close()
+			return
 		}
-		file.Close()
+		t.Error("cannot open session file (was the file created?)")
 	})
 
 	t.Cleanup(func() {
