@@ -57,16 +57,9 @@ func (s *mockServer) handleLogIn(w http.ResponseWriter, r *http.Request, sess se
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	err := sess.Set("username", username)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	err = sess.Set("logged", true)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	sess.Set("username", username)
+	sess.Set("logged", true)
+
 	s.players = append(s.players, username)
 }
 
@@ -87,10 +80,7 @@ func (s *mockServer) handleStartGame(w http.ResponseWriter, _ *http.Request, ses
 		return
 	}
 
-	err := sess.Set("score", 0)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-	}
+	sess.Set("score", 0)
 }
 
 func (s *mockServer) handleLeaveGame(w http.ResponseWriter, _ *http.Request, sess session.Session) {
@@ -100,10 +90,7 @@ func (s *mockServer) handleLeaveGame(w http.ResponseWriter, _ *http.Request, ses
 		return
 	}
 
-	err := sess.Delete("score")
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-	}
+	sess.Delete("score")
 }
 
 func (s *mockServer) handleScore(w http.ResponseWriter, r *http.Request, sess session.Session) {
@@ -124,9 +111,7 @@ func (s *mockServer) handleScore(w http.ResponseWriter, r *http.Request, sess se
 		return
 	}
 
-	if err := sess.Set("score", score+1); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-	}
+	sess.Set("score", score+1)
 }
 
 type stubCookieManager struct {

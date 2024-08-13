@@ -5,11 +5,12 @@ import (
 )
 
 type session struct {
-	p  Provider
-	id string
-	v  map[string]any
-	ct int64
-	at int64
+	p    Provider
+	id   string
+	v    map[string]any
+	ct   int64
+	at   int64
+	sync bool
 }
 
 func (s *session) SessionID() string {
@@ -17,17 +18,22 @@ func (s *session) SessionID() string {
 }
 
 func (s *session) Get(key string) any {
-	s.p.SessionSync(s)
+	if got, ok := s.v[key]; ok {
+		return got
+	}
+	if !s.sync && s.p.SessionSync(s) != nil {
+		return nil
+	}
+	s.sync = true
 	return s.v[key]
 }
 
-func (s *session) Set(key string, value any) error {
+func (s *session) Set(key string, value any) {
 	rValue := reflect.ValueOf(value)
 	for rValue.Kind() == reflect.Pointer {
 		rValue = reflect.Indirect(rValue)
 	}
 	s.v[key] = s.mapped(rValue)
-	return nil
 }
 
 func (s *session) mapped(v reflect.Value) any {
@@ -59,7 +65,14 @@ func (s *session) mapped(v reflect.Value) any {
 	}
 }
 
-func (s *session) Delete(key string) error {
+func (s *session) Delete(key string) {
+	if _, ok := s.v[key]; ok {
+		delete(s.v, key)
+		return
+	}
+	if !s.sync && s.p.SessionSync(s) != nil {
+		return
+	}
+	s.sync = true
 	delete(s.v, key)
-	return nil
 }

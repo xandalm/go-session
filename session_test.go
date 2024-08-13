@@ -2,8 +2,6 @@ package session
 
 import (
 	"testing"
-
-	"github.com/xandalm/go-session/testing/assert"
 )
 
 func TestSession_SessionID(t *testing.T) {
@@ -13,6 +11,7 @@ func TestSession_SessionID(t *testing.T) {
 		map[string]any{},
 		NowTimeNanoseconds(),
 		NowTimeNanoseconds(),
+		true,
 	}
 
 	got := sess.SessionID()
@@ -32,6 +31,7 @@ func TestSession_Get(t *testing.T) {
 			map[string]any{"foo": "bar"},
 			NowTimeNanoseconds(),
 			NowTimeNanoseconds(),
+			true,
 		}
 
 		got := sess.Get("foo")
@@ -63,13 +63,12 @@ func TestSession_Set(t *testing.T) {
 		map[string]any{},
 		NowTimeNanoseconds(),
 		NowTimeNanoseconds(),
+		true,
 	}
 	key := "foo"
 	value := "bar"
 
-	err := sess.Set(key, value)
-
-	assert.NoError(t, err)
+	sess.Set(key, value)
 
 	got, ok := sess.v[key]
 	if !ok {
@@ -87,13 +86,25 @@ func TestSession_Delete(t *testing.T) {
 		map[string]any{"foo": "bar"},
 		NowTimeNanoseconds(),
 		NowTimeNanoseconds(),
+		false,
 	}
 
-	err := sess.Delete("foo")
-
-	assert.NoError(t, err)
+	sess.Delete("foo")
 
 	if _, ok := sess.v["foo"]; ok {
 		t.Error("didn't delete value")
 	}
+
+	t.Run("tell provider to sync data", func(t *testing.T) {
+		provider := &spyProvider{}
+
+		(&session{
+			p:  provider,
+			id: "abcde",
+		}).Delete("foo")
+
+		if provider.callsToSync == 0 {
+			t.Fatal("didn't tell provider")
+		}
+	})
 }

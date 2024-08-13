@@ -21,18 +21,16 @@ func newStubSession(id string) *stubSession {
 	}
 }
 
-func (s *stubSession) Set(key string, value any) error {
+func (s *stubSession) Set(key string, value any) {
 	s.V[key] = value
-	return nil
 }
 
 func (s *stubSession) Get(key string) any {
 	return s.V[key]
 }
 
-func (s *stubSession) Delete(key string) error {
+func (s *stubSession) Delete(key string) {
 	delete(s.V, key)
-	return nil
 }
 
 func (s *stubSession) SessionID() string {

@@ -13,9 +13,9 @@ import (
 
 type Session interface {
 	SessionID() string
-	Set(string, any) error
+	Set(string, any)
 	Get(string) any
-	Delete(string) error
+	Delete(string)
 }
 
 type StorageItem interface {

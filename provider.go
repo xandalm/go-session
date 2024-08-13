@@ -173,6 +173,7 @@ func (p *provider) sessionInit(sid string) (Session, error) {
 		make(map[string]any),
 		now,
 		now,
+		false,
 	}
 	p.cached.Add(sess)
 	return sess, nil

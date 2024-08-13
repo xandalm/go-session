@@ -20,6 +20,7 @@ func TestCache_Add(t *testing.T) {
 			map[string]any{},
 			NowTimeNanoseconds(),
 			NowTimeNanoseconds(),
+			false,
 		}
 
 		c.Add(s)
@@ -77,6 +78,7 @@ func TestCache_Add(t *testing.T) {
 			map[string]any{},
 			NowTimeNanoseconds(),
 			NowTimeNanoseconds(),
+			false,
 		})
 
 		if c.collec.Len() != 2 {
@@ -422,6 +424,7 @@ func TestSessionGC(t *testing.T) {
 			map[string]any{},
 			now - int64(3*time.Millisecond),
 			now - int64(3*time.Millisecond),
+			true,
 		})
 		storage.data[sid1] = map[string]any{}
 
@@ -431,6 +434,7 @@ func TestSessionGC(t *testing.T) {
 			map[string]any{},
 			now,
 			now,
+			true,
 		})
 		storage.data[sid2] = map[string]any{}
 
