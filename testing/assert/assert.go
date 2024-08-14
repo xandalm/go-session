@@ -13,7 +13,7 @@ func output(common string, out []any) string {
 	if str, ok := out[0].(string); ok {
 		return fmt.Sprintf(str, out[1:]...)
 	}
-	panic("output argument must be a fmt string")
+	panic("assert: output argument must be a fmt string")
 }
 
 func isNil(v any) bool {

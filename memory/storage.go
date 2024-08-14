@@ -50,7 +50,7 @@ func NewStorage() *storage {
 // Save item into storage.
 func (s *storage) Save(id string, values map[string]any) error {
 	if id == "" {
-		panic("empty id")
+		panic("session: empty id")
 	}
 	item := &StorageItem{id, values}
 	s.mu.Lock()

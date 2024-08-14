@@ -117,7 +117,7 @@ type provider struct {
 // Returns a new provider (address for pointer reference).
 func newProvider(storage Storage) *provider {
 	if storage == nil {
-		panic("nil storage")
+		panic("session: nil storage")
 	}
 	p := &provider{
 		cached: &cache{
@@ -128,12 +128,12 @@ func newProvider(storage Storage) *provider {
 	}
 	sids, err := storage.List()
 	if err != nil {
-		panic("unable to load storage sessions")
+		panic("session: unable to load storage sessions")
 	}
 	for _, sid := range sids {
 		data, err := storage.Read(sid)
 		if err != nil {
-			panic("unable to load storage sessions")
+			panic("session: unable to load storage sessions")
 		}
 		p.cached.Add(&sessionInfo{
 			sid,

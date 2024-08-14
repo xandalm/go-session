@@ -44,9 +44,9 @@ func (s *session) Set(key string, value any) {
 func (s *session) mapped(v reflect.Value) any {
 	switch v.Kind() {
 	case reflect.Func:
-		panic("cannot stores func into session")
+		panic("session: cannot stores func into session")
 	case reflect.Chan:
-		panic("cannot stores chan into session")
+		panic("session: cannot stores chan into session")
 	case reflect.Struct:
 		vFields := reflect.VisibleFields(v.Type())
 		m := map[string]any{}

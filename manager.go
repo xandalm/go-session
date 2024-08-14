@@ -85,10 +85,10 @@ type Manager struct {
 // The provider cannot be nil and cookie name cannot be empty.
 func newManager(provider Provider, cookieName string, maxAge int64, adapter AgeCheckerAdapter) *Manager {
 	if provider == nil {
-		panic("nil provider")
+		panic("session: nil provider")
 	}
 	if cookieName == "" {
-		panic("empty cookie name")
+		panic("session: empty cookie name")
 	}
 	return &Manager{
 		provider:   provider,
@@ -108,10 +108,10 @@ func (m *Manager) sessionID() string {
 
 func (m *Manager) assertProviderAndCookieName() {
 	if m.provider == nil {
-		panic("nil provider")
+		panic("session: nil provider")
 	}
 	if m.cookieName == "" {
-		panic("empty cookie name")
+		panic("session: empty cookie name")
 	}
 }
 
@@ -131,7 +131,7 @@ func (m *Manager) StartSession(w http.ResponseWriter, r *http.Request) (session 
 		session, err = m.provider.SessionRead(sid)
 	}
 	if err != nil || session == nil {
-		panic("unable to start the session")
+		panic("session: unable to start the session")
 	}
 	go func(ctx context.Context) {
 		<-ctx.Done()
@@ -181,7 +181,7 @@ func Config(cookieName string, maxAge int64, adapter AgeCheckerAdapter, storage 
 
 func assertIsConfigured() {
 	if manager == nil {
-		panic("must configure session manager, use Config method")
+		panic("session: must configure session manager, use Config method")
 	}
 }
 
