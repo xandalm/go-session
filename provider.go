@@ -105,6 +105,8 @@ type cacheI interface {
 	Get(sid string) *sessionInfo
 }
 
+var ReservedFields = []string{"ct", "at"}
+
 // Provider that communicates with storage api to init, read and destroy sessions.
 type provider struct {
 	mu      sync.Mutex
