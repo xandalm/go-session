@@ -168,7 +168,9 @@ func (m *Manager) GC() {
 
 var manager *Manager
 
-func Reset(cookieName string, maxAge int64, adapter AgeCheckerAdapter, storage Storage) {
+// Configure the session cookie name, the session expiration
+// time and where the sessions values will be held (storage).
+func Config(cookieName string, maxAge int64, adapter AgeCheckerAdapter, storage Storage) {
 	manager = newManager(
 		newProvider(storage),
 		cookieName,
@@ -177,10 +179,24 @@ func Reset(cookieName string, maxAge int64, adapter AgeCheckerAdapter, storage S
 	)
 }
 
+func assertIsConfigured() {
+	if manager == nil {
+		panic("must configure session manager, use Config method")
+	}
+}
+
+// Starts the session.
+//
+// Creates a new one, or restores accordingly to HTTP cookie.
 func Start(w http.ResponseWriter, r *http.Request) Session {
+	assertIsConfigured()
 	return manager.StartSession(w, r)
 }
 
+// Destroys the session.
+//
+// The HTTP cookie will be removed.
 func Destroy(w http.ResponseWriter, r *http.Request) {
+	assertIsConfigured()
 	manager.DestroySession(w, r)
 }

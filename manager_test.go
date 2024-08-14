@@ -143,7 +143,7 @@ func TestReset(t *testing.T) {
 	maxAge := int64(60)
 	adapter := SecondsAgeCheckerAdapter
 	storage := newStubStorage()
-	Reset(cookieName, maxAge, adapter, storage)
+	Config(cookieName, maxAge, adapter, storage)
 
 	assert.NotNil(t, manager)
 }

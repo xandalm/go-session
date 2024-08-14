@@ -350,14 +350,14 @@ func doPost(handler http.Handler, url string, body io.Reader, headers map[string
 }
 
 func TestSessionsWithMemoryStorage(t *testing.T) {
-	session.Reset("SESSION_ID", 1, session.SecondsAgeCheckerAdapter, memory.NewStorage())
+	session.Config("SESSION_ID", 1, session.SecondsAgeCheckerAdapter, memory.NewStorage())
 
 	performTest(t)
 }
 
 func TestSessionsWithFileSystemStorage(t *testing.T) {
 	path := "sessions_from_integration_test"
-	session.Reset("SESSION_ID", 1, session.SecondsAgeCheckerAdapter, filesystem.NewStorage(path, ""))
+	session.Config("SESSION_ID", 1, session.SecondsAgeCheckerAdapter, filesystem.NewStorage(path, ""))
 
 	performTest(t)
 
