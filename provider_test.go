@@ -14,29 +14,28 @@ func TestCache_Add(t *testing.T) {
 			list.New(),
 			[]*cacheNode{},
 		}
-		s := &session{
-			nil,
-			"1",
-			map[string]any{},
-			NowTimeNanoseconds(),
-			NowTimeNanoseconds(),
-			false,
-		}
 
-		c.Add(s)
+		sid := "1"
+		ct := NowTimeNanoseconds()
+		at := NowTimeNanoseconds()
+		c.Add(&sessionInfo{
+			sid,
+			ct,
+			at,
+		})
 
 		if c.collec.Len() < 1 {
 			t.Fatal("didn't add session on cache collection")
 		}
 
 		got := c.collec.Front().Value.(*cacheNode).info
-		want := &sessionInfo{
-			s.id,
-			s.ct,
-			s.at,
+		want := sessionInfo{
+			sid,
+			ct,
+			at,
 		}
 
-		assert.Equal(t, got, want)
+		assert.Equal(t, *got, want)
 
 		t.Run("add in sid sorted index", func(t *testing.T) {
 			if len(c.sidIdx) < 1 {
@@ -49,7 +48,7 @@ func TestCache_Add(t *testing.T) {
 
 			got := node.info
 
-			assert.Equal(t, got, want)
+			assert.Equal(t, *got, want)
 		})
 
 	})
@@ -72,13 +71,10 @@ func TestCache_Add(t *testing.T) {
 			[]*cacheNode{node},
 		}
 
-		c.Add(&session{
-			nil,
+		c.Add(&sessionInfo{
 			"1",
-			map[string]any{},
 			NowTimeNanoseconds(),
 			NowTimeNanoseconds(),
-			false,
 		})
 
 		if c.collec.Len() != 2 {
@@ -273,7 +269,11 @@ func TestSessionRead(t *testing.T) {
 		at: time.Now().UnixNano(),
 	}
 
-	cache.Add(sess)
+	cache.Add(&sessionInfo{
+		sess.id,
+		sess.ct,
+		sess.at,
+	})
 
 	t.Run("returns session", func(t *testing.T) {
 		sid := "17af454"
@@ -305,11 +305,6 @@ func TestSessionDestroy(t *testing.T) {
 
 	provider := &provider{}
 
-	sess := &session{
-		p:  provider,
-		id: "17af454",
-		v:  map[string]any{},
-	}
 	storage := &stubStorage{
 		data: map[string]map[string]any{
 			"17af454": {},
@@ -320,13 +315,17 @@ func TestSessionDestroy(t *testing.T) {
 		list.New(),
 		[]*cacheNode{},
 	}
-	cache.Add(sess)
+
+	sid := "17af454"
+
+	cache.Add(&sessionInfo{
+		sid: sid,
+	})
 
 	provider.cached = cache
 	provider.storage = storage
 
 	t.Run("destroys session", func(t *testing.T) {
-		sid := "17af454"
 		err := provider.SessionDestroy(sid)
 
 		assert.NoError(t, err)
@@ -418,23 +417,17 @@ func TestSessionGC(t *testing.T) {
 
 		now := time.Now().UnixNano()
 
-		cache.Add(&session{
-			provider,
+		cache.Add(&sessionInfo{
 			sid1,
-			map[string]any{},
 			now - int64(3*time.Millisecond),
 			now - int64(3*time.Millisecond),
-			true,
 		})
 		storage.data[sid1] = map[string]any{}
 
-		cache.Add(&session{
-			provider,
+		cache.Add(&sessionInfo{
 			sid2,
-			map[string]any{},
 			now,
 			now,
-			true,
 		})
 		storage.data[sid2] = map[string]any{}
 

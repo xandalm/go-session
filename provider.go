@@ -45,16 +45,12 @@ func (c *cache) find(sid string) *cacheNode {
 	return nil
 }
 
-func (c *cache) Add(sess *session) {
+func (c *cache) Add(info *sessionInfo) {
 	node := &cacheNode{
-		&sessionInfo{
-			sess.id,
-			sess.ct,
-			sess.at,
-		}, 0, nil,
+		info, 0, nil,
 	}
 	node.anchor = c.collec.PushBack(node)
-	node.sidIdxPos, _ = c.findIndex(sess.id)
+	node.sidIdxPos, _ = c.findIndex(info.sid)
 	c.sidIdx = slices.Insert(c.sidIdx, node.sidIdxPos, node)
 }
 
@@ -94,24 +90,19 @@ func (c *cache) ExpiredSessions(checker AgeChecker) []string {
 	return ret
 }
 
-func (c *cache) Get(sid string) *session {
+func (c *cache) Get(sid string) *sessionInfo {
 	if found := c.find(sid); found != nil {
-		return &session{
-			id: found.info.sid,
-			v:  map[string]any{},
-			ct: found.info.ct,
-			at: found.info.at,
-		}
+		return found.info
 	}
 	return nil
 }
 
 type cacheI interface {
-	Add(sess *session)
+	Add(sess *sessionInfo)
 	Contains(sid string) bool
 	ExpiredSessions(checker AgeChecker) []string
 	Remove(sid string)
-	Get(sid string) *session
+	Get(sid string) *sessionInfo
 }
 
 // Provider that communicates with storage api to init, read and destroy sessions.
@@ -126,13 +117,29 @@ func newProvider(storage Storage) *provider {
 	if storage == nil {
 		panic("nil storage")
 	}
-	return &provider{
+	p := &provider{
 		cached: &cache{
 			list.New(),
 			[]*cacheNode{},
 		},
 		storage: storage,
 	}
+	sids, err := storage.List()
+	if err != nil {
+		panic("unable to load storage sessions")
+	}
+	for _, sid := range sids {
+		data, err := storage.Read(sid)
+		if err != nil {
+			panic("unable to load storage sessions")
+		}
+		p.cached.Add(&sessionInfo{
+			sid,
+			data["ct"].(int64),
+			data["at"].(int64),
+		})
+	}
+	return p
 }
 
 var (
@@ -175,7 +182,11 @@ func (p *provider) sessionInit(sid string) (Session, error) {
 		now,
 		false,
 	}
-	p.cached.Add(sess)
+	p.cached.Add(&sessionInfo{
+		sess.id,
+		sess.ct,
+		sess.at,
+	})
 	return sess, nil
 }
 
@@ -187,9 +198,15 @@ func (p *provider) sessionInit(sid string) (Session, error) {
 func (p *provider) SessionRead(sid string) (Session, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if sess := p.cached.Get(sid); sess != nil {
-		sess.p = p
-		return sess, nil
+	if info := p.cached.Get(sid); info != nil {
+		return &session{
+			p,
+			info.sid,
+			make(map[string]any),
+			info.ct,
+			info.at,
+			false,
+		}, nil
 	}
 	return p.sessionInit(sid)
 }
