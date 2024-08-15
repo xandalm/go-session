@@ -180,6 +180,7 @@ func (p *provider) sessionInit(sid string) (Session, error) {
 	}
 	now := time.Now().UnixNano()
 	sess := &session{
+		sync.Mutex{},
 		p,
 		sid,
 		make(map[string]any),
@@ -205,6 +206,7 @@ func (p *provider) SessionRead(sid string) (Session, error) {
 	defer p.mu.Unlock()
 	if info := p.cached.Get(sid); info != nil {
 		return &session{
+			sync.Mutex{},
 			p,
 			info.sid,
 			make(map[string]any),

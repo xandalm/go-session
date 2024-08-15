@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"sync"
 	"time"
 )
 
@@ -73,7 +72,6 @@ var SecondsAgeCheckerAdapter AgeCheckerAdapter = func(maxAge int64) AgeChecker {
 // expired session is removed through the GC routine, which checks
 // this condition.
 type Manager struct {
-	mu         sync.Mutex
 	provider   Provider
 	cookieName string
 	maxAge     int64
@@ -118,8 +116,6 @@ func (m *Manager) assertProviderAndCookieName() {
 // Creates or retrieve the session based on the http cookie.
 func (m *Manager) StartSession(w http.ResponseWriter, r *http.Request) (session Session) {
 	m.assertProviderAndCookieName()
-	m.mu.Lock()
-	defer m.mu.Unlock()
 	cookie, err := r.Cookie(m.cookieName)
 	if err != nil || cookie.Value == "" {
 		sid := m.sessionID()
@@ -143,8 +139,6 @@ func (m *Manager) StartSession(w http.ResponseWriter, r *http.Request) (session 
 // Destroys the session, finally cleaning up the http cookie.
 func (m *Manager) DestroySession(w http.ResponseWriter, r *http.Request) {
 	m.assertProviderAndCookieName()
-	m.mu.Lock()
-	defer m.mu.Unlock()
 	cookie, err := r.Cookie(m.cookieName)
 	if err != nil || cookie.Value == "" {
 		return
@@ -158,8 +152,6 @@ func (m *Manager) DestroySession(w http.ResponseWriter, r *http.Request) {
 
 // Creates a routine to check for expired sessions and remove them.
 func (m *Manager) GC() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
 	m.provider.SessionGC(m.adapter(m.maxAge))
 	time.AfterFunc(time.Duration(m.maxAge), func() {
 		m.GC()
@@ -177,6 +169,7 @@ func Config(cookieName string, maxAge int64, adapter AgeCheckerAdapter, storage 
 		maxAge,
 		adapter,
 	)
+	manager.GC()
 }
 
 func assertIsConfigured() {

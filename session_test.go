@@ -1,11 +1,13 @@
 package session
 
 import (
+	"sync"
 	"testing"
 )
 
 func TestSession_SessionID(t *testing.T) {
 	sess := &session{
+		sync.Mutex{},
 		nil,
 		"abcde",
 		map[string]any{},
@@ -26,6 +28,7 @@ func TestSession_Get(t *testing.T) {
 	t.Run("return value", func(t *testing.T) {
 		dummyProvider := &stubProvider{}
 		sess := &session{
+			sync.Mutex{},
 			dummyProvider,
 			"abcde",
 			map[string]any{"foo": "bar"},
@@ -58,6 +61,7 @@ func TestSession_Get(t *testing.T) {
 
 func TestSession_Set(t *testing.T) {
 	sess := &session{
+		sync.Mutex{},
 		nil,
 		"abcde",
 		map[string]any{},
@@ -81,6 +85,7 @@ func TestSession_Set(t *testing.T) {
 
 func TestSession_Delete(t *testing.T) {
 	sess := &session{
+		sync.Mutex{},
 		nil,
 		"abcde",
 		map[string]any{"foo": "bar"},

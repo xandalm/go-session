@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"sync"
 )
 
 type session struct {
+	mu   sync.Mutex
 	p    Provider
 	id   string
 	v    map[string]any
@@ -20,6 +22,8 @@ func (s *session) SessionID() string {
 }
 
 func (s *session) Get(key string) any {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if got, ok := s.v[key]; ok {
 		return got
 	}
@@ -31,6 +35,8 @@ func (s *session) Get(key string) any {
 }
 
 func (s *session) Set(key string, value any) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if slices.Contains(ReservedFields, key) {
 		panic(fmt.Sprintf("sorry, you can't use any from %v as key", ReservedFields))
 	}
@@ -71,6 +77,8 @@ func (s *session) mapped(v reflect.Value) any {
 }
 
 func (s *session) Delete(key string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if _, ok := s.v[key]; ok {
 		delete(s.v, key)
 		return
