@@ -15,27 +15,20 @@ func TestCache_Add(t *testing.T) {
 			[]*cacheNode{},
 		}
 
-		sid := "1"
-		ct := NowTimeNanoseconds()
-		at := NowTimeNanoseconds()
-		c.Add(&sessionInfo{
-			sid,
-			ct,
-			at,
-		})
+		sess := &session{
+			id: "1",
+			ct: NowTimeNanoseconds(),
+			at: NowTimeNanoseconds(),
+		}
+		c.Add(sess)
 
 		if c.collec.Len() < 1 {
 			t.Fatal("didn't add session on cache collection")
 		}
 
-		got := c.collec.Front().Value.(*cacheNode).info
-		want := sessionInfo{
-			sid,
-			ct,
-			at,
-		}
+		got := c.collec.Front().Value.(*cacheNode).sess
 
-		assert.Equal(t, *got, want)
+		assert.Equal(t, got, sess)
 
 		t.Run("add in sid sorted index", func(t *testing.T) {
 			if len(c.sidIdx) < 1 {
@@ -46,9 +39,9 @@ func TestCache_Add(t *testing.T) {
 
 			assert.NotNil(t, node)
 
-			got := node.info
+			got := node.sess
 
-			assert.Equal(t, *got, want)
+			assert.Equal(t, got, sess)
 		})
 
 	})
@@ -56,10 +49,10 @@ func TestCache_Add(t *testing.T) {
 	t.Run("keep sid index sorted", func(t *testing.T) {
 
 		node := &cacheNode{
-			info: &sessionInfo{
-				"3",
-				NowTimeNanoseconds(),
-				NowTimeNanoseconds(),
+			sess: &session{
+				id: "3",
+				ct: NowTimeNanoseconds(),
+				at: NowTimeNanoseconds(),
 			},
 		}
 
@@ -71,10 +64,10 @@ func TestCache_Add(t *testing.T) {
 			[]*cacheNode{node},
 		}
 
-		c.Add(&sessionInfo{
-			"1",
-			NowTimeNanoseconds(),
-			NowTimeNanoseconds(),
+		c.Add(&session{
+			id: "1",
+			ct: NowTimeNanoseconds(),
+			at: NowTimeNanoseconds(),
 		})
 
 		if c.collec.Len() != 2 {
@@ -85,7 +78,7 @@ func TestCache_Add(t *testing.T) {
 			t.Fatal("didn't add session in sid sorted index")
 		}
 
-		if c.sidIdx[0].info.sid != "1" {
+		if c.sidIdx[0].sess.id != "1" {
 			t.Errorf("sid sorted index isn't sorted")
 		}
 	})
@@ -94,10 +87,10 @@ func TestCache_Add(t *testing.T) {
 func TestCache_Contains(t *testing.T) {
 
 	node := &cacheNode{
-		info: &sessionInfo{
-			"1",
-			NowTimeNanoseconds(),
-			NowTimeNanoseconds(),
+		sess: &session{
+			id: "1",
+			ct: NowTimeNanoseconds(),
+			at: NowTimeNanoseconds(),
 		},
 	}
 
@@ -131,10 +124,10 @@ func TestCache_Contains(t *testing.T) {
 func TestCache_Remove(t *testing.T) {
 
 	node := &cacheNode{
-		info: &sessionInfo{
-			"1",
-			NowTimeNanoseconds(),
-			NowTimeNanoseconds(),
+		sess: &session{
+			id: "1",
+			ct: NowTimeNanoseconds(),
+			at: NowTimeNanoseconds(),
 		},
 	}
 
@@ -162,20 +155,20 @@ func TestCache_ExpiredSessions(t *testing.T) {
 	collec := list.New()
 
 	node1 := &cacheNode{
-		info: &sessionInfo{
-			"1",
-			NowTimeNanoseconds(),
-			NowTimeNanoseconds(),
+		sess: &session{
+			id: "1",
+			ct: NowTimeNanoseconds(),
+			at: NowTimeNanoseconds(),
 		},
 	}
 
 	time.Sleep(10 * time.Millisecond)
 
 	node2 := &cacheNode{
-		info: &sessionInfo{
-			"2",
-			NowTimeNanoseconds(),
-			NowTimeNanoseconds(),
+		sess: &session{
+			id: "2",
+			ct: NowTimeNanoseconds(),
+			at: NowTimeNanoseconds(),
 		},
 	}
 
@@ -269,11 +262,7 @@ func TestSessionRead(t *testing.T) {
 		at: time.Now().UnixNano(),
 	}
 
-	cache.Add(&sessionInfo{
-		sess.id,
-		sess.ct,
-		sess.at,
-	})
+	cache.Add(sess)
 
 	t.Run("returns session", func(t *testing.T) {
 		sid := "17af454"
@@ -282,7 +271,7 @@ func TestSessionRead(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, got)
 
-		assert.Equal(t, *got.(*session), *sess, "didn't get expected session, got %#v but want %#v", *got.(*session), *sess)
+		assert.Equal(t, got.(*session), sess, "didn't get expected session, got %#v but want %#v", got.(*session), sess)
 	})
 
 	t.Run("init session if has no session to read", func(t *testing.T) {
@@ -318,8 +307,8 @@ func TestSessionDestroy(t *testing.T) {
 
 	sid := "17af454"
 
-	cache.Add(&sessionInfo{
-		sid: sid,
+	cache.Add(&session{
+		id: sid,
 	})
 
 	provider.cached = cache
@@ -370,13 +359,9 @@ func TestSessionSync(t *testing.T) {
 		}
 		provider.SessionSync(sess)
 
-		want := session{
-			p:  provider,
-			id: "17af454",
-			v:  map[string]any{"foo": "bar"},
-		}
+		want := map[string]any{"foo": "bar"}
 
-		assert.Equal(t, *sess, want)
+		assert.Equal(t, sess.v, want)
 	})
 
 	t.Run("push session data to storage too", func(t *testing.T) {
@@ -417,17 +402,17 @@ func TestSessionGC(t *testing.T) {
 
 		now := time.Now().UnixNano()
 
-		cache.Add(&sessionInfo{
-			sid1,
-			now - int64(3*time.Millisecond),
-			now - int64(3*time.Millisecond),
+		cache.Add(&session{
+			id: sid1,
+			ct: now - int64(3*time.Millisecond),
+			at: now - int64(3*time.Millisecond),
 		})
 		storage.data[sid1] = map[string]any{}
 
-		cache.Add(&sessionInfo{
-			sid2,
-			now,
-			now,
+		cache.Add(&session{
+			id: sid2,
+			ct: now,
+			at: now,
 		})
 		storage.data[sid2] = map[string]any{}
 

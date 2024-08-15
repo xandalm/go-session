@@ -40,6 +40,7 @@ func (s *session) Set(key string, value any) {
 	if slices.Contains(ReservedFields, key) {
 		panic(fmt.Sprintf("sorry, you can't use any from %v as key", ReservedFields))
 	}
+	s.sync = false
 	rValue := reflect.ValueOf(value)
 	for rValue.Kind() == reflect.Pointer {
 		rValue = reflect.Indirect(rValue)

@@ -8,14 +8,8 @@ import (
 	"time"
 )
 
-type sessionInfo struct {
-	sid string
-	ct  int64
-	at  int64
-}
-
 type cacheNode struct {
-	info      *sessionInfo
+	sess      *session
 	sidIdxPos int
 	anchor    *list.Element
 }
@@ -27,10 +21,10 @@ type cache struct {
 
 func (c *cache) findIndex(sid string) (int, bool) {
 	return slices.BinarySearchFunc(c.sidIdx, sid, func(in *cacheNode, s string) int {
-		if in.info.sid < s {
+		if in.sess.id < s {
 			return -1
 		}
-		if in.info.sid > s {
+		if in.sess.id > s {
 			return 1
 		}
 		return 0
@@ -45,12 +39,12 @@ func (c *cache) find(sid string) *cacheNode {
 	return nil
 }
 
-func (c *cache) Add(info *sessionInfo) {
+func (c *cache) Add(sess *session) {
 	node := &cacheNode{
-		info, 0, nil,
+		sess, 0, nil,
 	}
 	node.anchor = c.collec.PushBack(node)
-	node.sidIdxPos, _ = c.findIndex(info.sid)
+	node.sidIdxPos, _ = c.findIndex(sess.id)
 	c.sidIdx = slices.Insert(c.sidIdx, node.sidIdxPos, node)
 }
 
@@ -83,29 +77,29 @@ func (c *cache) ExpiredSessions(checker AgeChecker) []string {
 			break
 		}
 		node := elem.Value.(*cacheNode)
-		if !checker.ShouldReap(node.info.ct) {
+		if !checker.ShouldReap(node.sess.ct) {
 			break
 		}
 		c.remove(node)
-		ret = append(ret, node.info.sid)
+		ret = append(ret, node.sess.id)
 		elem = elem.Next()
 	}
 	return ret
 }
 
-func (c *cache) Get(sid string) *sessionInfo {
+func (c *cache) Get(sid string) *session {
 	if found := c.find(sid); found != nil {
-		return found.info
+		return found.sess
 	}
 	return nil
 }
 
 type cacheI interface {
-	Add(sess *sessionInfo)
+	Add(sess *session)
 	Contains(sid string) bool
 	ExpiredSessions(checker AgeChecker) []string
 	Remove(sid string)
-	Get(sid string) *sessionInfo
+	Get(sid string) *session
 }
 
 var ReservedFields = []string{"ct", "at"}
@@ -138,10 +132,11 @@ func newProvider(storage Storage) *provider {
 		if err != nil {
 			panic("session: unable to load storage sessions")
 		}
-		p.cached.Add(&sessionInfo{
-			sid,
-			data["ct"].(int64),
-			data["at"].(int64),
+		p.cached.Add(&session{
+			p:  p,
+			id: sid,
+			ct: data["ct"].(int64),
+			at: data["at"].(int64),
 		})
 	}
 	return p
@@ -188,11 +183,7 @@ func (p *provider) sessionInit(sid string) (Session, error) {
 		now,
 		false,
 	}
-	p.cached.Add(&sessionInfo{
-		sess.id,
-		sess.ct,
-		sess.at,
-	})
+	p.cached.Add(sess)
 	return sess, nil
 }
 
@@ -204,16 +195,8 @@ func (p *provider) sessionInit(sid string) (Session, error) {
 func (p *provider) SessionRead(sid string) (Session, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if info := p.cached.Get(sid); info != nil {
-		return &session{
-			sync.Mutex{},
-			p,
-			info.sid,
-			make(map[string]any),
-			info.ct,
-			info.at,
-			false,
-		}, nil
+	if sess := p.cached.Get(sid); sess != nil {
+		return sess, nil
 	}
 	return p.sessionInit(sid)
 }
