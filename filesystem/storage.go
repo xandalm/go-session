@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -46,7 +47,11 @@ func (s *storage) List() ([]string, error) {
 	ret := []string{}
 	entries, _ := os.ReadDir(s.path)
 	for _, e := range entries {
-		ret = append(ret, e.Name())
+		name := e.Name()
+		if !strings.HasPrefix(name, s.prefix) {
+			continue
+		}
+		ret = append(ret, name)
 	}
 	return ret, nil
 }
