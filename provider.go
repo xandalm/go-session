@@ -65,6 +65,9 @@ func (c *cache) Remove(sid string) {
 func (c *cache) remove(n *cacheNode) {
 	c.collec.Remove(n.anchor)
 	c.sidIdx = slices.Delete(c.sidIdx, n.sidIdxPos, n.sidIdxPos+1)
+	for i := n.sidIdxPos; i < len(c.sidIdx); i++ {
+		c.sidIdx[i].sidIdxPos -= 1
+	}
 }
 
 func (c *cache) Contains(sid string) bool {
