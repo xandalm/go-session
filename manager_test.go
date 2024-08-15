@@ -105,7 +105,7 @@ func TestManager(t *testing.T) {
 
 		defer func() {
 			r := recover()
-			if r != "unable to start the session" {
+			if r != "session: unable to start the session" {
 				t.Errorf("didn't get expected panic, got: %v", r)
 			}
 		}()
