@@ -29,7 +29,8 @@ func NewStorage(path, prefix string) *storage {
 }
 
 func (s *storage) Save(id string, values map[string]any) error {
-
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	file, err := os.OpenFile(filepath.Join(s.path, s.prefix+id), os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		return err
@@ -44,6 +45,8 @@ func (s *storage) Save(id string, values map[string]any) error {
 }
 
 func (s *storage) List() ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	ret := []string{}
 	entries, _ := os.ReadDir(s.path)
 	for _, e := range entries {
@@ -57,6 +60,8 @@ func (s *storage) List() ([]string, error) {
 }
 
 func (s *storage) Read(id string) (map[string]any, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	data := make(map[string]any)
 	file, err := os.Open(filepath.Join(s.path, s.prefix+id))
 	if err != nil {
@@ -72,6 +77,8 @@ func (s *storage) Read(id string) (map[string]any, error) {
 }
 
 func (s *storage) Delete(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	err := os.Remove(filepath.Join(s.path, s.prefix+id))
 	if err != nil {
 		return err
