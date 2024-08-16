@@ -2,6 +2,7 @@ package memory
 
 import (
 	"container/list"
+	"maps"
 	"slices"
 	"sync"
 )
@@ -52,7 +53,7 @@ func (s *storage) Save(id string, values map[string]any) error {
 	if id == "" {
 		panic("session: empty id")
 	}
-	item := &StorageItem{id, values}
+	item := &StorageItem{id, maps.Clone(values)}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.save(item); err != nil {
@@ -103,7 +104,8 @@ func (s *storage) Read(id string) (map[string]any, error) {
 	if found == nil {
 		return make(map[string]any), nil
 	}
-	return found.Value.(*StorageItem).values, nil
+	item := found.Value.(*StorageItem)
+	return maps.Clone(item.values), nil
 }
 
 func (s *storage) List() ([]string, error) {
