@@ -357,7 +357,7 @@ func TestSessionSync(t *testing.T) {
 			id: "17af454",
 			v:  map[string]any{},
 		}
-		provider.SessionSync(sess)
+		provider.SessionPull(sess)
 
 		want := map[string]any{"foo": "bar"}
 
@@ -371,7 +371,7 @@ func TestSessionSync(t *testing.T) {
 			v:  map[string]any{},
 		}
 		sess.v["key"] = "value"
-		provider.SessionSync(sess)
+		provider.SessionPush(sess)
 
 		got := storage.data[sess.id]
 		want := sess.v

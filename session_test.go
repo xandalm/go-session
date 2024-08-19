@@ -45,7 +45,7 @@ func TestSession_Get(t *testing.T) {
 		}
 	})
 
-	t.Run("tell provider to sync data", func(t *testing.T) {
+	t.Run("tell provider to pull session data", func(t *testing.T) {
 		provider := &spyProvider{}
 
 		(&session{
@@ -53,7 +53,7 @@ func TestSession_Get(t *testing.T) {
 			id: "abcde",
 		}).Get("foo")
 
-		if provider.callsToSync == 0 {
+		if provider.callsToPull == 0 {
 			t.Fatal("didn't tell provider")
 		}
 	})
@@ -91,7 +91,7 @@ func TestSession_Delete(t *testing.T) {
 		map[string]any{"foo": "bar"},
 		NowTimeNanoseconds(),
 		NowTimeNanoseconds(),
-		false,
+		true,
 	}
 
 	sess.Delete("foo")
@@ -100,7 +100,7 @@ func TestSession_Delete(t *testing.T) {
 		t.Error("didn't delete value")
 	}
 
-	t.Run("tell provider to sync data", func(t *testing.T) {
+	t.Run("tell provider to pull session data", func(t *testing.T) {
 		provider := &spyProvider{}
 
 		(&session{
@@ -108,7 +108,7 @@ func TestSession_Delete(t *testing.T) {
 			id: "abcde",
 		}).Delete("foo")
 
-		if provider.callsToSync == 0 {
+		if provider.callsToPull == 0 {
 			t.Fatal("didn't tell provider")
 		}
 	})

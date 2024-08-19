@@ -135,6 +135,7 @@ func newProvider(storage Storage) *provider {
 		p.cached.Add(&session{
 			p:  p,
 			id: sid,
+			v:  make(map[string]any),
 			ct: data["ct"].(int64),
 			at: data["at"].(int64),
 		})
@@ -212,9 +213,7 @@ func (p *provider) SessionDestroy(sid string) error {
 	return nil
 }
 
-func (p *provider) SessionSync(sess Session) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+func (p *provider) SessionPush(sess Session) error {
 	_sess := sess.(*session)
 	got, _ := p.storage.Read(_sess.id)
 	for k, v := range _sess.v {
@@ -224,6 +223,18 @@ func (p *provider) SessionSync(sess Session) error {
 		_sess.v[k] = v
 	}
 	p.storage.Save(_sess.id, _sess.v)
+	return nil
+}
+
+func (p *provider) SessionPull(sess Session) error {
+	_sess := sess.(*session)
+	got, _ := p.storage.Read(_sess.id)
+	for k, v := range _sess.v {
+		got[k] = v
+	}
+	for k, v := range got {
+		_sess.v[k] = v
+	}
 	return nil
 }
 

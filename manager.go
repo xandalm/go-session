@@ -1,7 +1,6 @@
 package session
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"io"
@@ -35,7 +34,8 @@ type Provider interface {
 	SessionInit(sid string) (Session, error)
 	SessionRead(sid string) (Session, error)
 	SessionDestroy(sid string) error
-	SessionSync(Session) error
+	SessionPush(Session) error
+	SessionPull(Session) error
 	SessionGC(checker AgeChecker)
 }
 
@@ -129,10 +129,10 @@ func (m *Manager) StartSession(w http.ResponseWriter, r *http.Request) (session 
 	if err != nil || session == nil {
 		panic("session: unable to start the session")
 	}
-	go func(ctx context.Context) {
-		<-ctx.Done()
-		m.provider.SessionSync(session)
-	}(r.Context())
+	// go func(ctx context.Context) {
+	// 	<-ctx.Done()
+	// 	m.provider.SessionSync(session)
+	// }(r.Context())
 	return
 }
 

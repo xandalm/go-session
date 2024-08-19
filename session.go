@@ -24,28 +24,25 @@ func (s *session) SessionID() string {
 func (s *session) Get(key string) any {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if got, ok := s.v[key]; ok {
-		return got
+	if !s.sync {
+		s.sync = s.p.SessionPull(s) == nil
 	}
-	if !s.sync && s.p.SessionSync(s) != nil {
-		return nil
-	}
-	s.sync = true
 	return s.v[key]
 }
 
 func (s *session) Set(key string, value any) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	if slices.Contains(ReservedFields, key) {
 		panic(fmt.Sprintf("sorry, you can't use any from %v as key", ReservedFields))
 	}
-	s.sync = false
 	rValue := reflect.ValueOf(value)
 	for rValue.Kind() == reflect.Pointer {
 		rValue = reflect.Indirect(rValue)
 	}
+
+	s.mu.Lock()
+	s.sync = false
 	s.v[key] = s.mapped(rValue)
+	s.mu.Unlock()
 }
 
 func (s *session) mapped(v reflect.Value) any {
@@ -80,13 +77,8 @@ func (s *session) mapped(v reflect.Value) any {
 func (s *session) Delete(key string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, ok := s.v[key]; ok {
-		delete(s.v, key)
-		return
+	if !s.sync {
+		s.sync = s.p.SessionPull(s) == nil
 	}
-	if !s.sync && s.p.SessionSync(s) != nil {
-		return
-	}
-	s.sync = true
 	delete(s.v, key)
 }

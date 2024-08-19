@@ -67,7 +67,11 @@ func (p *stubProvider) SessionDestroy(sid string) error {
 	return nil
 }
 
-func (p *stubProvider) SessionSync(sess Session) error {
+func (p *stubProvider) SessionPush(sess Session) error {
+	return nil
+}
+
+func (p *stubProvider) SessionPull(sess Session) error {
 	return nil
 }
 
@@ -87,7 +91,11 @@ func (p *stubFailingProvider) SessionDestroy(sid string) error {
 	return errFoo
 }
 
-func (p *stubFailingProvider) SessionSync(sess Session) error {
+func (p *stubFailingProvider) SessionPush(sess Session) error {
+	return errFoo
+}
+
+func (p *stubFailingProvider) SessionPull(sess Session) error {
 	return errFoo
 }
 
@@ -98,6 +106,7 @@ type spyProvider struct {
 	callsToRead    int
 	callsToDestroy int
 	callsToSync    int
+	callsToPull    int
 	callsToGC      int
 }
 
@@ -116,8 +125,13 @@ func (p *spyProvider) SessionDestroy(sid string) error {
 	return nil
 }
 
-func (p *spyProvider) SessionSync(sess Session) error {
+func (p *spyProvider) SessionPush(sess Session) error {
 	p.callsToSync++
+	return nil
+}
+
+func (p *spyProvider) SessionPull(sess Session) error {
+	p.callsToPull++
 	return nil
 }
 
@@ -145,7 +159,11 @@ func (p *mockProvider) SessionDestroy(sid string) error {
 	return p.SessionDestroyFunc(sid)
 }
 
-func (p *mockProvider) SessionSync(sess Session) error {
+func (p *mockProvider) SessionPush(sess Session) error {
+	return p.SessionSyncFunc(sess)
+}
+
+func (p *mockProvider) SessionPull(sess Session) error {
 	return p.SessionSyncFunc(sess)
 }
 
