@@ -125,7 +125,7 @@ func (sf *sessionFactory) OverrideValues(sess Session, v map[string]any) {
 
 // ExtractValues implements SessionFactory.
 func (sf *sessionFactory) ExtractValues(sess Session) map[string]any {
-	panic("unimplemented")
+	return maps.Clone(sess.(*session).v)
 }
 
 func NewSessionFactory() SessionFactory {

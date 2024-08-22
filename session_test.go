@@ -168,4 +168,17 @@ func TestSessionFactory(t *testing.T) {
 
 		assert.Equal(t, sess.v, want)
 	})
+
+	t.Run("return session values", func(t *testing.T) {
+		sess := &session{
+			id: "1",
+			v: map[string]any{
+				"update": "before",
+				"keep":   "same",
+			},
+		}
+
+		got := sf.ExtractValues(sess)
+		assert.Equal(t, got, sess.v)
+	})
 }
