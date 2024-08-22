@@ -125,5 +125,21 @@ func TestSessionFactory(t *testing.T) {
 			err := sess.Set("foo", "baz")
 			assert.Error(t, err, ErrProtectedKeyName)
 		})
+
+		t.Run("meta values will not be mutable by common values", func(t *testing.T) {
+			meta := map[string]any{"foo": "bar"}
+			common := map[string]any{"foo": "rab", "baz": "jaz"}
+
+			got := sf.Restore("1", meta, common)
+
+			assert.NotNil(t, got)
+
+			sess := got.(*session)
+			assert.Equal(t, sess.id, id)
+			assert.Equal(t, sess.v, map[string]any{
+				"foo": "bar",
+				"baz": "jaz",
+			})
+		})
 	})
 }

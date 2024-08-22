@@ -105,13 +105,13 @@ func (sf *sessionFactory) Create(id string, m map[string]any) Session {
 func (sf *sessionFactory) Restore(id string, m map[string]any, v map[string]any) Session {
 	s := &session{
 		id: id,
-		v:  make(map[string]any),
+		v:  maps.Clone(v),
 	}
-	for k, v := range m {
-		protectedKeyNames[k] = 1
-		s.v[k] = v
+	for key, value := range m {
+		delete(s.v, key) // meta can't be common
+		protectedKeyNames[key] = 1
+		s.v[key] = value
 	}
-	maps.Copy(s.v, v)
 	return s
 }
 
