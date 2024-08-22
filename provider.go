@@ -107,10 +107,10 @@ var ReservedFields = []string{"ct", "at"}
 
 // Provider that communicates with storage api to init, read and destroy sessions.
 type provider struct {
-	mu      sync.Mutex
-	cached  cacheI
-	storage Storage
-	sf      SessionFactory
+	mu sync.Mutex     // Mutex
+	ca cacheI         // Cached sessions
+	st Storage        // Session storage (persistence, normally)
+	sf SessionFactory // Session factory for session analysis
 }
 
 // Returns a new provider (address for pointer reference).
@@ -119,12 +119,12 @@ func newProvider(sf SessionFactory, storage Storage) *provider {
 		panic("session: nil storage")
 	}
 	p := &provider{
-		cached: &cache{
+		ca: &cache{
 			list.New(),
 			[]*cacheNode{},
 		},
-		sf:      sf,
-		storage: storage,
+		sf: sf,
+		st: storage,
 	}
 	sids, err := storage.List()
 	if err != nil {
@@ -135,7 +135,7 @@ func newProvider(sf SessionFactory, storage Storage) *provider {
 		if err != nil {
 			panic("session: unable to load storage sessions")
 		}
-		p.cached.Add(p.sf.Restore(sid, data))
+		p.ca.Add(p.sf.Restore(sid, data))
 		// p.cached.Add(&session{
 		// 	p:  p,
 		// 	id: sid,
@@ -175,7 +175,7 @@ func (p *provider) sessionInit(sid string) (Session, error) {
 	if sid == "" {
 		return nil, ErrEmptySessionId
 	}
-	if p.cached.Contains(sid) {
+	if p.ca.Contains(sid) {
 		return nil, ErrDuplicatedSessionId
 	}
 	now := time.Now().UnixNano()
@@ -191,7 +191,7 @@ func (p *provider) sessionInit(sid string) (Session, error) {
 	// 	now,
 	// 	false,
 	// }
-	p.cached.Add(sess)
+	p.ca.Add(sess)
 	return sess, nil
 }
 
@@ -203,7 +203,7 @@ func (p *provider) sessionInit(sid string) (Session, error) {
 func (p *provider) SessionRead(sid string) (Session, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if sess := p.cached.Get(sid); sess != nil {
+	if sess := p.ca.Get(sid); sess != nil {
 		return sess, nil
 	}
 	return p.sessionInit(sid)
@@ -215,25 +215,25 @@ func (p *provider) SessionRead(sid string) (Session, error) {
 func (p *provider) SessionDestroy(sid string) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.cached.Remove(sid)
-	p.storage.Delete(sid)
+	p.ca.Remove(sid)
+	p.st.Delete(sid)
 	return nil
 }
 
 func (p *provider) SessionPush(sess Session) error {
 	// _sess := sess.(*session)
 	values := p.sf.ExtractValues(sess)
-	data, _ := p.storage.Read(sess.SessionID())
+	data, _ := p.st.Read(sess.SessionID())
 	for k, v := range values {
 		data[k] = v
 	}
-	p.storage.Save(sess.SessionID(), data)
+	p.st.Save(sess.SessionID(), data)
 	return nil
 }
 
 func (p *provider) SessionPull(sess Session) error {
 	// _sess := sess.(*session)
-	data, _ := p.storage.Read(sess.SessionID())
+	data, _ := p.st.Read(sess.SessionID())
 	p.sf.OverrideValues(sess, data)
 	// for k, v := range _sess.v {
 	// 	got[k] = v
@@ -249,7 +249,7 @@ func (p *provider) SessionPull(sess Session) error {
 func (p *provider) SessionGC(checker AgeChecker) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	for _, sid := range p.cached.ExpiredSessions(checker) {
-		p.storage.Delete(sid)
+	for _, sid := range p.ca.ExpiredSessions(checker) {
+		p.st.Delete(sid)
 	}
 }

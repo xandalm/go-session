@@ -217,9 +217,9 @@ func TestProvider_SessionInit(t *testing.T) {
 		[]*cacheNode{},
 	}
 	provider := &provider{
-		cached:  cache,
-		storage: dummyStorage,
-		sf:      sf,
+		ca: cache,
+		st: dummyStorage,
+		sf: sf,
 	}
 
 	t.Run("init the session", func(t *testing.T) {
@@ -270,9 +270,9 @@ func TestProvider_SessionRead(t *testing.T) {
 	}
 
 	provider := &provider{
-		cached:  cache,
-		storage: dummyStorage,
-		sf:      sf,
+		ca: cache,
+		st: dummyStorage,
+		sf: sf,
 	}
 
 	sess := &stubSession{
@@ -329,8 +329,8 @@ func TestProvider_SessionDestroy(t *testing.T) {
 		Id: sid,
 	})
 
-	provider.cached = cache
-	provider.storage = storage
+	provider.ca = cache
+	provider.st = storage
 
 	t.Run("destroys session", func(t *testing.T) {
 		err := provider.SessionDestroy(sid)
@@ -380,9 +380,9 @@ func TestProvider_SessionSynchronization(t *testing.T) {
 	}
 
 	provider := &provider{
-		cached:  dummyCache,
-		storage: storage,
-		sf:      sf,
+		ca: dummyCache,
+		st: storage,
+		sf: sf,
 	}
 
 	t.Run("pull session data from storage", func(t *testing.T) {
@@ -425,8 +425,8 @@ func TestProvider_SessionGC(t *testing.T) {
 		}
 
 		provider := &provider{
-			cached:  cache,
-			storage: storage,
+			ca: cache,
+			st: storage,
 		}
 
 		sid1 := "17af450"
@@ -493,7 +493,7 @@ func TestProvider(t *testing.T) {
 
 	assert.NotNil(t, p)
 
-	p.cached.Contains("1")
+	p.ca.Contains("1")
 
 	got1, err := p.SessionRead("1")
 	assert.NoError(t, err)
