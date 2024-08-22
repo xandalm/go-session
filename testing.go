@@ -26,6 +26,9 @@ func (s *stubSession) Set(key string, value any) {
 }
 
 func (s *stubSession) Get(key string) any {
+	if key == "ct" {
+		return s.CreatedAt
+	}
 	return s.V[key]
 }
 
@@ -35,6 +38,29 @@ func (s *stubSession) Delete(key string) {
 
 func (s *stubSession) SessionID() string {
 	return s.Id
+}
+
+type mockSessionFactory struct {
+	CreateFunc         func(string) Session
+	RestoreFunc        func(string, map[string]any) Session
+	OverrideValuesFunc func(Session, map[string]any)
+	ExtractValuesFunc  func(Session) map[string]any
+}
+
+func (sf *mockSessionFactory) Create(sid string) Session {
+	return sf.CreateFunc(sid)
+}
+
+func (sf *mockSessionFactory) Restore(sid string, values map[string]any) Session {
+	return sf.RestoreFunc(sid, values)
+}
+
+func (sf *mockSessionFactory) OverrideValues(sess Session, values map[string]any) {
+	sf.OverrideValuesFunc(sess, values)
+}
+
+func (sf *mockSessionFactory) ExtractValues(sess Session) map[string]any {
+	return sf.ExtractValuesFunc(sess)
 }
 
 type stubProvider struct {

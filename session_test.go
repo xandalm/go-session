@@ -8,7 +8,7 @@ import (
 func TestSession_SessionID(t *testing.T) {
 	sess := &session{
 		sync.Mutex{},
-		nil,
+		// nil,
 		"abcde",
 		map[string]any{},
 		NowTimeNanoseconds(),
@@ -26,10 +26,10 @@ func TestSession_SessionID(t *testing.T) {
 
 func TestSession_Get(t *testing.T) {
 	t.Run("return value", func(t *testing.T) {
-		dummyProvider := &stubProvider{}
+		// dummyProvider := &stubProvider{}
 		sess := &session{
 			sync.Mutex{},
-			dummyProvider,
+			// dummyProvider,
 			"abcde",
 			map[string]any{"foo": "bar"},
 			NowTimeNanoseconds(),
@@ -45,24 +45,24 @@ func TestSession_Get(t *testing.T) {
 		}
 	})
 
-	t.Run("tell provider to pull session data", func(t *testing.T) {
-		provider := &spyProvider{}
+	// t.Run("tell provider to pull session data", func(t *testing.T) {
+	// 	provider := &spyProvider{}
 
-		(&session{
-			p:  provider,
-			id: "abcde",
-		}).Get("foo")
+	// 	(&session{
+	// 		// p:  provider,
+	// 		id: "abcde",
+	// 	}).Get("foo")
 
-		if provider.callsToPull == 0 {
-			t.Fatal("didn't tell provider")
-		}
-	})
+	// 	if provider.callsToPull == 0 {
+	// 		t.Fatal("didn't tell provider")
+	// 	}
+	// })
 }
 
 func TestSession_Set(t *testing.T) {
 	sess := &session{
 		sync.Mutex{},
-		nil,
+		// nil,
 		"abcde",
 		map[string]any{},
 		NowTimeNanoseconds(),
@@ -86,7 +86,7 @@ func TestSession_Set(t *testing.T) {
 func TestSession_Delete(t *testing.T) {
 	sess := &session{
 		sync.Mutex{},
-		nil,
+		// nil,
 		"abcde",
 		map[string]any{"foo": "bar"},
 		NowTimeNanoseconds(),
@@ -100,16 +100,16 @@ func TestSession_Delete(t *testing.T) {
 		t.Error("didn't delete value")
 	}
 
-	t.Run("tell provider to pull session data", func(t *testing.T) {
-		provider := &spyProvider{}
+	// t.Run("tell provider to pull session data", func(t *testing.T) {
+	// 	provider := &spyProvider{}
 
-		(&session{
-			p:  provider,
-			id: "abcde",
-		}).Delete("foo")
+	// 	(&session{
+	// 		// p:  provider,
+	// 		id: "abcde",
+	// 	}).Delete("foo")
 
-		if provider.callsToPull == 0 {
-			t.Fatal("didn't tell provider")
-		}
-	})
+	// 	if provider.callsToPull == 0 {
+	// 		t.Fatal("didn't tell provider")
+	// 	}
+	// })
 }

@@ -9,7 +9,7 @@ import (
 )
 
 type cacheNode struct {
-	sess      *session
+	sess      Session
 	sidIdxPos int
 	anchor    *list.Element
 }
@@ -21,10 +21,10 @@ type cache struct {
 
 func (c *cache) findIndex(sid string) (int, bool) {
 	return slices.BinarySearchFunc(c.sidIdx, sid, func(in *cacheNode, s string) int {
-		if in.sess.id < s {
+		if in.sess.SessionID() < s {
 			return -1
 		}
-		if in.sess.id > s {
+		if in.sess.SessionID() > s {
 			return 1
 		}
 		return 0
@@ -39,12 +39,12 @@ func (c *cache) find(sid string) *cacheNode {
 	return nil
 }
 
-func (c *cache) Add(sess *session) {
+func (c *cache) Add(sess Session) {
 	node := &cacheNode{
 		sess, 0, nil,
 	}
 	node.anchor = c.collec.PushBack(node)
-	node.sidIdxPos, _ = c.findIndex(sess.id)
+	node.sidIdxPos, _ = c.findIndex(sess.SessionID())
 	c.sidIdx = slices.Insert(c.sidIdx, node.sidIdxPos, node)
 }
 
@@ -77,17 +77,18 @@ func (c *cache) ExpiredSessions(checker AgeChecker) []string {
 			break
 		}
 		node := elem.Value.(*cacheNode)
-		if !checker.ShouldReap(node.sess.ct) {
+		ct := node.sess.Get("ct").(int64)
+		if !checker.ShouldReap(ct) {
 			break
 		}
 		c.remove(node)
-		ret = append(ret, node.sess.id)
+		ret = append(ret, node.sess.SessionID())
 		elem = elem.Next()
 	}
 	return ret
 }
 
-func (c *cache) Get(sid string) *session {
+func (c *cache) Get(sid string) Session {
 	if found := c.find(sid); found != nil {
 		return found.sess
 	}
@@ -95,11 +96,11 @@ func (c *cache) Get(sid string) *session {
 }
 
 type cacheI interface {
-	Add(sess *session)
+	Add(sess Session)
 	Contains(sid string) bool
 	ExpiredSessions(checker AgeChecker) []string
 	Remove(sid string)
-	Get(sid string) *session
+	Get(sid string) Session
 }
 
 var ReservedFields = []string{"ct", "at"}
@@ -109,10 +110,11 @@ type provider struct {
 	mu      sync.Mutex
 	cached  cacheI
 	storage Storage
+	sf      SessionFactory
 }
 
 // Returns a new provider (address for pointer reference).
-func newProvider(storage Storage) *provider {
+func newProvider(sf SessionFactory, storage Storage) *provider {
 	if storage == nil {
 		panic("session: nil storage")
 	}
@@ -121,6 +123,7 @@ func newProvider(storage Storage) *provider {
 			list.New(),
 			[]*cacheNode{},
 		},
+		sf:      sf,
 		storage: storage,
 	}
 	sids, err := storage.List()
@@ -132,13 +135,14 @@ func newProvider(storage Storage) *provider {
 		if err != nil {
 			panic("session: unable to load storage sessions")
 		}
-		p.cached.Add(&session{
-			p:  p,
-			id: sid,
-			v:  make(map[string]any),
-			ct: data["ct"].(int64),
-			at: data["at"].(int64),
-		})
+		p.cached.Add(p.sf.Restore(sid, data))
+		// p.cached.Add(&session{
+		// 	p:  p,
+		// 	id: sid,
+		// 	v:  make(map[string]any),
+		// 	ct: data["ct"].(int64),
+		// 	at: data["at"].(int64),
+		// })
 	}
 	return p
 }
@@ -175,15 +179,18 @@ func (p *provider) sessionInit(sid string) (Session, error) {
 		return nil, ErrDuplicatedSessionId
 	}
 	now := time.Now().UnixNano()
-	sess := &session{
-		sync.Mutex{},
-		p,
-		sid,
-		make(map[string]any),
-		now,
-		now,
-		false,
-	}
+	sess := p.sf.Create(sid)
+	sess.Set("ct", now)
+	sess.Set("at", now)
+	// sess := &session{
+	// 	sync.Mutex{},
+	// 	p,
+	// 	sid,
+	// 	make(map[string]any),
+	// 	now,
+	// 	now,
+	// 	false,
+	// }
 	p.cached.Add(sess)
 	return sess, nil
 }
@@ -214,27 +221,26 @@ func (p *provider) SessionDestroy(sid string) error {
 }
 
 func (p *provider) SessionPush(sess Session) error {
-	_sess := sess.(*session)
-	got, _ := p.storage.Read(_sess.id)
-	for k, v := range _sess.v {
-		got[k] = v
+	// _sess := sess.(*session)
+	values := p.sf.ExtractValues(sess)
+	data, _ := p.storage.Read(sess.SessionID())
+	for k, v := range values {
+		data[k] = v
 	}
-	for k, v := range got {
-		_sess.v[k] = v
-	}
-	p.storage.Save(_sess.id, _sess.v)
+	p.storage.Save(sess.SessionID(), data)
 	return nil
 }
 
 func (p *provider) SessionPull(sess Session) error {
-	_sess := sess.(*session)
-	got, _ := p.storage.Read(_sess.id)
-	for k, v := range _sess.v {
-		got[k] = v
-	}
-	for k, v := range got {
-		_sess.v[k] = v
-	}
+	// _sess := sess.(*session)
+	data, _ := p.storage.Read(sess.SessionID())
+	p.sf.OverrideValues(sess, data)
+	// for k, v := range _sess.v {
+	// 	got[k] = v
+	// }
+	// for k, v := range got {
+	// 	_sess.v[k] = v
+	// }
 	return nil
 }
 

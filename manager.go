@@ -16,6 +16,13 @@ type Session interface {
 	Delete(string)
 }
 
+type SessionFactory interface {
+	Create(string) Session
+	Restore(string, map[string]any) Session
+	OverrideValues(Session, map[string]any)
+	ExtractValues(Session) map[string]any
+}
+
 type StorageItem interface {
 	Id() string
 	Set(k string, v any)
@@ -163,12 +170,12 @@ var manager *Manager
 
 // Configure the session cookie name, the session expiration
 // time and where the sessions values will be held (storage).
-func Config(cookieName string, maxAge int64, adapter AgeCheckerAdapter, storage Storage) {
+func Config(cookieName string, maxAge int64, adapter AgeCheckerAdapter, sessionFactory SessionFactory, storage Storage) {
 	if manager != nil && manager.timer != nil {
 		manager.timer.Stop()
 	}
 	manager = newManager(
-		newProvider(storage),
+		newProvider(sessionFactory, storage),
 		cookieName,
 		maxAge,
 		adapter,

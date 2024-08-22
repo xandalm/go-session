@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -143,7 +144,31 @@ func TestReset(t *testing.T) {
 	maxAge := int64(60)
 	adapter := SecondsAgeCheckerAdapter
 	storage := newStubStorage()
-	Config(cookieName, maxAge, adapter, storage)
+	sessionFactory := &mockSessionFactory{
+		CreateFunc: func(s string) Session {
+			return &stubSession{
+				Id: s,
+				V:  make(map[string]any),
+			}
+		},
+		RestoreFunc: func(s string, m map[string]any) Session {
+			return &stubSession{
+				Id: s,
+				V:  maps.Clone(m),
+			}
+		},
+		OverrideValuesFunc: func(s Session, m map[string]any) {
+			sess := s.(*stubSession)
+			for k, v := range m {
+				sess.V[k] = v
+			}
+		},
+		ExtractValuesFunc: func(s Session) map[string]any {
+			sess := s.(*stubSession)
+			return maps.Clone(sess.V)
+		},
+	}
+	Config(cookieName, maxAge, adapter, sessionFactory, storage)
 
 	assert.NotNil(t, manager)
 }
