@@ -3,6 +3,8 @@ package session
 import (
 	"sync"
 	"testing"
+
+	"github.com/xandalm/go-session/testing/assert"
 )
 
 func TestSession_SessionID(t *testing.T) {
@@ -45,18 +47,6 @@ func TestSession_Get(t *testing.T) {
 		}
 	})
 
-	// t.Run("tell provider to pull session data", func(t *testing.T) {
-	// 	provider := &spyProvider{}
-
-	// 	(&session{
-	// 		// p:  provider,
-	// 		id: "abcde",
-	// 	}).Get("foo")
-
-	// 	if provider.callsToPull == 0 {
-	// 		t.Fatal("didn't tell provider")
-	// 	}
-	// })
 }
 
 func TestSession_Set(t *testing.T) {
@@ -100,16 +90,23 @@ func TestSession_Delete(t *testing.T) {
 		t.Error("didn't delete value")
 	}
 
-	// t.Run("tell provider to pull session data", func(t *testing.T) {
-	// 	provider := &spyProvider{}
+}
 
-	// 	(&session{
-	// 		// p:  provider,
-	// 		id: "abcde",
-	// 	}).Delete("foo")
+func TestSessionFactory(t *testing.T) {
+	var sf SessionFactory = NewSessionFactory()
 
-	// 	if provider.callsToPull == 0 {
-	// 		t.Fatal("didn't tell provider")
-	// 	}
-	// })
+	assert.NotNil(t, sf)
+
+	t.Run("creates session", func(t *testing.T) {
+		id := "1"
+		v := map[string]any{"foo": "bar"}
+
+		got := sf.Create(id, v)
+
+		assert.NotNil(t, got)
+
+		sess := got.(*session)
+		assert.Equal(t, sess.id, id)
+		assert.Equal(t, sess.v, v)
+	})
 }

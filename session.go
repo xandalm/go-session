@@ -2,6 +2,7 @@ package session
 
 import (
 	"fmt"
+	"maps"
 	"reflect"
 	"slices"
 	"sync"
@@ -81,4 +82,35 @@ func (s *session) Delete(key string) {
 	// 	s.sync = s.p.SessionPull(s) == nil
 	// }
 	delete(s.v, key)
+}
+
+type sessionFactory struct{}
+
+// Create implements SessionFactory.
+func (sf *sessionFactory) Create(id string, m map[string]any) Session {
+	s := &session{
+		id: id,
+		v:  make(map[string]any),
+	}
+	maps.Copy(s.v, m)
+	return s
+}
+
+// ExtractValues implements SessionFactory.
+func (sf *sessionFactory) ExtractValues(Session) map[string]any {
+	panic("unimplemented")
+}
+
+// OverrideValues implements SessionFactory.
+func (sf *sessionFactory) OverrideValues(Session, map[string]any) {
+	panic("unimplemented")
+}
+
+// Restore implements SessionFactory.
+func (sf *sessionFactory) Restore(id string, m map[string]any, v map[string]any) Session {
+	panic("unimplemented")
+}
+
+func NewSessionFactory() SessionFactory {
+	return &sessionFactory{}
 }
