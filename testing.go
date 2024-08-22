@@ -288,38 +288,38 @@ func (ss *spyStorage) Delete(id string) error {
 
 var errFoo error = errors.New("foo error")
 
-type stubFailingStorage struct {
-}
+// type stubFailingStorage struct {
+// }
 
-func (s *stubFailingStorage) Save(r StorageItem) error {
-	return errFoo
-}
+// func (s *stubFailingStorage) Save(r StorageItem) error {
+// 	return errFoo
+// }
 
-func (s *stubFailingStorage) Load(id string) (StorageItem, error) {
-	return nil, errFoo
-}
+// func (s *stubFailingStorage) Load(id string) (StorageItem, error) {
+// 	return nil, errFoo
+// }
 
-func (s *stubFailingStorage) Delete(id string) error {
-	return errFoo
-}
+// func (s *stubFailingStorage) Delete(id string) error {
+// 	return errFoo
+// }
 
-type mockStorage struct {
-	SaveFunc   func(StorageItem) error
-	LoadFunc   func(string) (StorageItem, error)
-	DeleteFunc func(string) error
-}
+// type mockStorage struct {
+// 	SaveFunc   func(StorageItem) error
+// 	LoadFunc   func(string) (StorageItem, error)
+// 	DeleteFunc func(string) error
+// }
 
-func (s *mockStorage) Save(r StorageItem) error {
-	return s.SaveFunc(r)
-}
+// func (s *mockStorage) Save(r StorageItem) error {
+// 	return s.SaveFunc(r)
+// }
 
-func (s *mockStorage) Load(id string) (StorageItem, error) {
-	return s.LoadFunc(id)
-}
+// func (s *mockStorage) Load(id string) (StorageItem, error) {
+// 	return s.LoadFunc(id)
+// }
 
-func (s *mockStorage) Delete(id string) error {
-	return s.DeleteFunc(id)
-}
+// func (s *mockStorage) Delete(id string) error {
+// 	return s.DeleteFunc(id)
+// }
 
 type stubMilliAgeChecker int64
 

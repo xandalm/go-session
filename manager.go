@@ -32,12 +32,12 @@ type SessionFactory interface {
 	ExtractValues(Session) map[string]any
 }
 
-type StorageItem interface {
-	Id() string
-	Set(k string, v any)
-	Delete(k string)
-	Values() map[string]any
-}
+// type StorageItem interface {
+// 	Id() string
+// 	Set(k string, v any)
+// 	Delete(k string)
+// 	Values() map[string]any
+// }
 
 type Storage interface {
 	Save(string, map[string]any) error
