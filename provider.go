@@ -9,18 +9,18 @@ import (
 )
 
 type cacheNode struct {
-	sess      Session
-	sidIdxPos int
-	anchor    *list.Element
+	sess   Session
+	idxPos int
+	anchor *list.Element
 }
 
 type cache struct {
 	collec *list.List   // absolute sessions (sessionInfo)
-	sidIdx []*cacheNode // sorted by id
+	idx    []*cacheNode // sorted by id
 }
 
 func (c *cache) findIndex(sid string) (int, bool) {
-	return slices.BinarySearchFunc(c.sidIdx, sid, func(in *cacheNode, s string) int {
+	return slices.BinarySearchFunc(c.idx, sid, func(in *cacheNode, s string) int {
 		if in.sess.SessionID() < s {
 			return -1
 		}
@@ -34,7 +34,7 @@ func (c *cache) findIndex(sid string) (int, bool) {
 func (c *cache) find(sid string) *cacheNode {
 	pos, has := c.findIndex(sid)
 	if has {
-		return c.sidIdx[pos]
+		return c.idx[pos]
 	}
 	return nil
 }
@@ -44,8 +44,8 @@ func (c *cache) Add(sess Session) {
 		sess, 0, nil,
 	}
 	node.anchor = c.collec.PushBack(node)
-	node.sidIdxPos, _ = c.findIndex(sess.SessionID())
-	c.sidIdx = slices.Insert(c.sidIdx, node.sidIdxPos, node)
+	node.idxPos, _ = c.findIndex(sess.SessionID())
+	c.idx = slices.Insert(c.idx, node.idxPos, node)
 }
 
 func (c *cache) Remove(sid string) {
@@ -58,9 +58,9 @@ func (c *cache) Remove(sid string) {
 
 func (c *cache) remove(n *cacheNode) {
 	c.collec.Remove(n.anchor)
-	c.sidIdx = slices.Delete(c.sidIdx, n.sidIdxPos, n.sidIdxPos+1)
-	for i := n.sidIdxPos; i < len(c.sidIdx); i++ {
-		c.sidIdx[i].sidIdxPos -= 1
+	c.idx = slices.Delete(c.idx, n.idxPos, n.idxPos+1)
+	for i := n.idxPos; i < len(c.idx); i++ {
+		c.idx[i].idxPos -= 1
 	}
 }
 

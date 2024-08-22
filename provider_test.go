@@ -31,11 +31,11 @@ func TestCache_Add(t *testing.T) {
 		assert.Equal(t, got, sess)
 
 		t.Run("add in sid sorted index", func(t *testing.T) {
-			if len(c.sidIdx) < 1 {
+			if len(c.idx) < 1 {
 				t.Fatal("didn't add session on sid based index")
 			}
 
-			node := c.sidIdx[len(c.sidIdx)-1]
+			node := c.idx[len(c.idx)-1]
 
 			assert.NotNil(t, node)
 
@@ -72,11 +72,11 @@ func TestCache_Add(t *testing.T) {
 			t.Fatal("didn't add session")
 		}
 
-		if len(c.sidIdx) != 2 {
+		if len(c.idx) != 2 {
 			t.Fatal("didn't add session in sid sorted index")
 		}
 
-		if c.sidIdx[0].sess.(*stubSession).Id != "1" {
+		if c.idx[0].sess.(*stubSession).Id != "1" {
 			t.Errorf("sid sorted index isn't sorted")
 		}
 	})
@@ -141,7 +141,7 @@ func TestCache_Remove(t *testing.T) {
 		t.Fatal("didn't remove from cache collection")
 	}
 
-	if len(c.sidIdx) == 1 {
+	if len(c.idx) == 1 {
 		t.Fatal("didn't remove from sid sorted index")
 	}
 }
