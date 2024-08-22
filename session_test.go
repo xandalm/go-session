@@ -142,4 +142,30 @@ func TestSessionFactory(t *testing.T) {
 			})
 		})
 	})
+
+	t.Run("override session values", func(t *testing.T) {
+		sess := &session{
+			id: "1",
+			v: map[string]any{
+				"update": "before",
+				"keep":   "same",
+			},
+		}
+
+		sf.OverrideValues(
+			sess,
+			map[string]any{
+				"update": "after",
+				"new":    "add",
+			},
+		)
+
+		want := map[string]any{
+			"update": "after",
+			"new":    "add",
+			"keep":   "same",
+		}
+
+		assert.Equal(t, sess.v, want)
+	})
 }
