@@ -113,7 +113,7 @@ func Error(t testing.TB, got, want error, out ...any) {
 	t.Helper()
 
 	if got != want {
-		common := fmt.Sprintf("expected error %v, but didn't get it", got)
+		common := fmt.Sprintf("expected error %v, but didn't get it", want)
 		t.Fatal(output(common, out))
 	}
 }
@@ -122,7 +122,7 @@ func NotError(t testing.TB, got, nwant error, out ...any) {
 	t.Helper()
 
 	if got == nwant {
-		common := fmt.Sprintf("didn't expected error %v, but got it", got)
+		common := fmt.Sprintf("didn't expected error %v, but got it", nwant)
 		t.Fatal(output(common, out))
 	}
 }
