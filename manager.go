@@ -17,9 +17,18 @@ type Session interface {
 }
 
 type SessionFactory interface {
-	Create(string) Session
-	Restore(string, map[string]any) Session
+	// Creates a Session with the given id and the meta values.
+	// It's suggested that the meta values can't be manipulated
+	// through [Session.Set] or [Session.Get]
+	Create(id string, m map[string]any) Session
+	// Similar to Create method, but this method assume that the
+	// session is being restored, allowing to put defined values.
+	Restore(id string, m map[string]any, v map[string]any) Session
+	// Merge session common values, overwriting old values and
+	// adding coming new values. The not collided values must
+	// be kept.
 	OverrideValues(Session, map[string]any)
+	// Return all values, including common and meta values.
 	ExtractValues(Session) map[string]any
 }
 

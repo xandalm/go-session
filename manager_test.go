@@ -145,15 +145,15 @@ func TestReset(t *testing.T) {
 	adapter := SecondsAgeCheckerAdapter
 	storage := newStubStorage()
 	sessionFactory := &mockSessionFactory{
-		CreateFunc: func(s string) Session {
+		CreateFunc: func(id string, m map[string]any) Session {
 			return &stubSession{
-				Id: s,
+				Id: id,
 				V:  make(map[string]any),
 			}
 		},
-		RestoreFunc: func(s string, m map[string]any) Session {
+		RestoreFunc: func(id string, m map[string]any, v map[string]any) Session {
 			return &stubSession{
-				Id: s,
+				Id: id,
 				V:  maps.Clone(m),
 			}
 		},

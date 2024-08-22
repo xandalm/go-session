@@ -135,14 +135,11 @@ func newProvider(sf SessionFactory, storage Storage) *provider {
 		if err != nil {
 			panic("session: unable to load storage sessions")
 		}
-		p.ca.Add(p.sf.Restore(sid, data))
-		// p.cached.Add(&session{
-		// 	p:  p,
-		// 	id: sid,
-		// 	v:  make(map[string]any),
-		// 	ct: data["ct"].(int64),
-		// 	at: data["at"].(int64),
-		// })
+		meta := map[string]any{
+			"ct": data["ct"],
+		}
+		delete(data, "ct")
+		p.ca.Add(p.sf.Restore(sid, meta, data))
 	}
 	return p
 }
@@ -179,18 +176,7 @@ func (p *provider) sessionInit(sid string) (Session, error) {
 		return nil, ErrDuplicatedSessionId
 	}
 	now := time.Now().UnixNano()
-	sess := p.sf.Create(sid)
-	sess.Set("ct", now)
-	sess.Set("at", now)
-	// sess := &session{
-	// 	sync.Mutex{},
-	// 	p,
-	// 	sid,
-	// 	make(map[string]any),
-	// 	now,
-	// 	now,
-	// 	false,
-	// }
+	sess := p.sf.Create(sid, map[string]any{"ct": now})
 	p.ca.Add(sess)
 	return sess, nil
 }
@@ -221,7 +207,6 @@ func (p *provider) SessionDestroy(sid string) error {
 }
 
 func (p *provider) SessionPush(sess Session) error {
-	// _sess := sess.(*session)
 	values := p.sf.ExtractValues(sess)
 	data, _ := p.st.Read(sess.SessionID())
 	for k, v := range values {
@@ -232,15 +217,8 @@ func (p *provider) SessionPush(sess Session) error {
 }
 
 func (p *provider) SessionPull(sess Session) error {
-	// _sess := sess.(*session)
 	data, _ := p.st.Read(sess.SessionID())
 	p.sf.OverrideValues(sess, data)
-	// for k, v := range _sess.v {
-	// 	got[k] = v
-	// }
-	// for k, v := range got {
-	// 	_sess.v[k] = v
-	// }
 	return nil
 }
 

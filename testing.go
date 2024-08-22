@@ -41,18 +41,18 @@ func (s *stubSession) SessionID() string {
 }
 
 type mockSessionFactory struct {
-	CreateFunc         func(string) Session
-	RestoreFunc        func(string, map[string]any) Session
+	CreateFunc         func(string, map[string]any) Session
+	RestoreFunc        func(string, map[string]any, map[string]any) Session
 	OverrideValuesFunc func(Session, map[string]any)
 	ExtractValuesFunc  func(Session) map[string]any
 }
 
-func (sf *mockSessionFactory) Create(sid string) Session {
-	return sf.CreateFunc(sid)
+func (sf *mockSessionFactory) Create(id string, m map[string]any) Session {
+	return sf.CreateFunc(id, m)
 }
 
-func (sf *mockSessionFactory) Restore(sid string, values map[string]any) Session {
-	return sf.RestoreFunc(sid, values)
+func (sf *mockSessionFactory) Restore(id string, m map[string]any, v map[string]any) Session {
+	return sf.RestoreFunc(id, m, v)
 }
 
 func (sf *mockSessionFactory) OverrideValues(sess Session, values map[string]any) {

@@ -204,11 +204,13 @@ func TestProvider_SessionInit(t *testing.T) {
 	dummyStorage := newStubStorage()
 
 	sf := &mockSessionFactory{
-		CreateFunc: func(s string) Session {
-			return &stubSession{
-				Id: s,
+		CreateFunc: func(id string, m map[string]any) Session {
+			s := &stubSession{
+				Id: id,
 				V:  make(map[string]any),
 			}
+			maps.Copy(s.V, m)
+			return s
 		},
 	}
 
@@ -255,17 +257,22 @@ func TestProvider_SessionRead(t *testing.T) {
 	}
 
 	sf := &mockSessionFactory{
-		CreateFunc: func(s string) Session {
-			return &stubSession{
-				Id: s,
+		CreateFunc: func(id string, m map[string]any) Session {
+			s := &stubSession{
+				Id: id,
 				V:  make(map[string]any),
 			}
+			maps.Copy(s.V, m)
+			return s
 		},
-		RestoreFunc: func(s string, m map[string]any) Session {
-			return &stubSession{
-				Id: s,
-				V:  m,
+		RestoreFunc: func(id string, m map[string]any, v map[string]any) Session {
+			s := &stubSession{
+				Id: id,
+				V:  make(map[string]any),
 			}
+			maps.Copy(s.V, m)
+			maps.Copy(s.V, v)
+			return s
 		},
 	}
 
@@ -475,17 +482,22 @@ func TestProvider(t *testing.T) {
 		},
 	}
 	sf := &mockSessionFactory{
-		CreateFunc: func(sid string) Session {
-			return &stubSession{
-				Id: sid,
+		CreateFunc: func(id string, m map[string]any) Session {
+			s := &stubSession{
+				Id: id,
 				V:  map[string]any{},
 			}
+			maps.Copy(s.V, m)
+			return s
 		},
-		RestoreFunc: func(sid string, m map[string]any) Session {
-			return &stubSession{
-				Id: sid,
-				V:  maps.Clone(m),
+		RestoreFunc: func(id string, m map[string]any, v map[string]any) Session {
+			s := &stubSession{
+				Id: id,
+				V:  map[string]any{},
 			}
+			maps.Copy(s.V, m)
+			maps.Copy(s.V, v)
+			return s
 		},
 	}
 
