@@ -115,9 +115,6 @@ type provider struct {
 
 // Returns a new provider (address for pointer reference).
 func newProvider(sf SessionFactory, storage Storage) *provider {
-	if storage == nil {
-		panic("session: nil storage")
-	}
 	p := &provider{
 		ca: &cache{
 			list.New(),
@@ -202,11 +199,16 @@ func (p *provider) SessionDestroy(sid string) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.ca.Remove(sid)
-	p.st.Delete(sid)
+	if p.st != nil {
+		p.st.Delete(sid)
+	}
 	return nil
 }
 
 func (p *provider) SessionPush(sess Session) error {
+	if p.st == nil {
+		return nil
+	}
 	values := p.sf.ExtractValues(sess)
 	data, _ := p.st.Read(sess.SessionID())
 	for k, v := range values {
@@ -217,6 +219,9 @@ func (p *provider) SessionPush(sess Session) error {
 }
 
 func (p *provider) SessionPull(sess Session) error {
+	if p.st == nil {
+		return nil
+	}
 	data, _ := p.st.Read(sess.SessionID())
 	p.sf.OverrideValues(sess, data)
 	return nil
@@ -228,6 +233,8 @@ func (p *provider) SessionGC(checker AgeChecker) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	for _, sid := range p.ca.ExpiredSessions(checker) {
-		p.st.Delete(sid)
+		if p.st != nil {
+			p.st.Delete(sid)
+		}
 	}
 }
