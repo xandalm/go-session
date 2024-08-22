@@ -1,6 +1,7 @@
 package session
 
 import (
+	"maps"
 	"sync"
 	"testing"
 
@@ -82,14 +83,34 @@ func TestSessionFactory(t *testing.T) {
 
 	t.Run("creates session", func(t *testing.T) {
 		id := "1"
-		v := map[string]any{"foo": "bar"}
+		m := map[string]any{"foo": "bar"}
 
-		got := sf.Create(id, v)
+		got := sf.Create(id, m)
 
 		assert.NotNil(t, got)
 
 		sess := got.(*session)
 		assert.Equal(t, sess.id, id)
-		assert.Equal(t, sess.v, v)
+		assert.Equal(t, sess.v, m)
 	})
+
+	t.Run("restores session", func(t *testing.T) {
+		id := "1"
+		m := map[string]any{"foo": "bar"}
+		v := map[string]any{"baz": "jaz"}
+
+		got := sf.Restore(id, m, v)
+
+		assert.NotNil(t, got)
+
+		sess := got.(*session)
+		assert.Equal(t, sess.id, id)
+
+		values := map[string]any{}
+		maps.Copy(values, m)
+		maps.Copy(values, v)
+
+		assert.Equal(t, sess.v, values)
+	})
+
 }
