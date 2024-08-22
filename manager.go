@@ -11,9 +11,9 @@ import (
 
 type Session interface {
 	SessionID() string
-	Set(string, any)
+	Set(string, any) error
 	Get(string) any
-	Delete(string)
+	Delete(string) error
 }
 
 type SessionFactory interface {

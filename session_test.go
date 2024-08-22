@@ -92,6 +92,13 @@ func TestSessionFactory(t *testing.T) {
 		sess := got.(*session)
 		assert.Equal(t, sess.id, id)
 		assert.Equal(t, sess.v, m)
+
+		t.Run("defined meta values can't be mutable by session Set and Delete methods, causing error", func(t *testing.T) {
+			sess := sf.Create("1", map[string]any{"foo": "bar"})
+
+			err := sess.Set("foo", "baz")
+			assert.Error(t, err, ErrProtectedKeyName)
+		})
 	})
 
 	t.Run("restores session", func(t *testing.T) {
@@ -111,6 +118,12 @@ func TestSessionFactory(t *testing.T) {
 		maps.Copy(values, v)
 
 		assert.Equal(t, sess.v, values)
-	})
 
+		t.Run("defined meta values can't be mutable by session Set and Delete methods, causing error", func(t *testing.T) {
+			sess := sf.Restore("1", map[string]any{"foo": "bar"}, map[string]any{"baz": "jaz"})
+
+			err := sess.Set("foo", "baz")
+			assert.Error(t, err, ErrProtectedKeyName)
+		})
+	})
 }

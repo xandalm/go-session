@@ -1,12 +1,15 @@
 package session
 
 import (
-	"fmt"
+	"errors"
 	"maps"
 	"reflect"
-	"slices"
 	"sync"
 )
+
+var ErrProtectedKeyName error = errors.New("session: the given key name is protected")
+
+var protectedKeyNames map[string]int8
 
 type session struct {
 	mu sync.Mutex
@@ -25,9 +28,9 @@ func (s *session) Get(key string) any {
 	return s.v[key]
 }
 
-func (s *session) Set(key string, value any) {
-	if slices.Contains(ReservedFields, key) {
-		panic(fmt.Sprintf("sorry, you can't use any from %v as key", ReservedFields))
+func (s *session) Set(key string, value any) error {
+	if _, ok := protectedKeyNames[key]; ok {
+		return ErrProtectedKeyName
 	}
 	rValue := reflect.ValueOf(value)
 	for rValue.Kind() == reflect.Pointer {
@@ -37,6 +40,7 @@ func (s *session) Set(key string, value any) {
 	s.mu.Lock()
 	s.v[key] = s.mapped(rValue)
 	s.mu.Unlock()
+	return nil
 }
 
 func (s *session) mapped(v reflect.Value) any {
@@ -68,14 +72,21 @@ func (s *session) mapped(v reflect.Value) any {
 	}
 }
 
-func (s *session) Delete(key string) {
+func (s *session) Delete(key string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if _, ok := protectedKeyNames[key]; ok {
+		return ErrProtectedKeyName
+	}
+
 	delete(s.v, key)
+	return nil
 }
 
-type sessionFactory struct{}
+type sessionFactory struct {
+	pkm map[string]int8
+}
 
 // Create implements SessionFactory.
 func (sf *sessionFactory) Create(id string, m map[string]any) Session {
@@ -83,7 +94,10 @@ func (sf *sessionFactory) Create(id string, m map[string]any) Session {
 		id: id,
 		v:  make(map[string]any),
 	}
-	maps.Copy(s.v, m)
+	for k, v := range m {
+		protectedKeyNames[k] = 1
+		s.v[k] = v
+	}
 	return s
 }
 
@@ -93,7 +107,10 @@ func (sf *sessionFactory) Restore(id string, m map[string]any, v map[string]any)
 		id: id,
 		v:  make(map[string]any),
 	}
-	maps.Copy(s.v, m)
+	for k, v := range m {
+		protectedKeyNames[k] = 1
+		s.v[k] = v
+	}
 	maps.Copy(s.v, v)
 	return s
 }
@@ -109,5 +126,11 @@ func (sf *sessionFactory) ExtractValues(Session) map[string]any {
 }
 
 func NewSessionFactory() SessionFactory {
-	return &sessionFactory{}
+	return &sessionFactory{
+		pkm: make(map[string]int8),
+	}
+}
+
+func init() {
+	protectedKeyNames = make(map[string]int8)
 }
