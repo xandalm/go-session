@@ -10,12 +10,8 @@ import (
 
 type session struct {
 	mu sync.Mutex
-	// p    Provider
-	id   string
-	v    map[string]any
-	ct   int64
-	at   int64
-	sync bool
+	id string
+	v  map[string]any
 }
 
 func (s *session) SessionID() string {
@@ -25,9 +21,7 @@ func (s *session) SessionID() string {
 func (s *session) Get(key string) any {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	// if !s.sync {
-	// 	s.sync = s.p.SessionPull(s) == nil
-	// }
+
 	return s.v[key]
 }
 
@@ -41,7 +35,6 @@ func (s *session) Set(key string, value any) {
 	}
 
 	s.mu.Lock()
-	s.sync = false
 	s.v[key] = s.mapped(rValue)
 	s.mu.Unlock()
 }
@@ -78,9 +71,7 @@ func (s *session) mapped(v reflect.Value) any {
 func (s *session) Delete(key string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	// if !s.sync {
-	// 	s.sync = s.p.SessionPull(s) == nil
-	// }
+
 	delete(s.v, key)
 }
 
