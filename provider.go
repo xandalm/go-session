@@ -113,8 +113,18 @@ type provider struct {
 	sf SessionFactory // Session factory for session analysis
 }
 
+var providerSyncTimer *time.Timer // must be stopped on new provider creation
+
+func interruptProviderSyncRoutine() {
+	if providerSyncTimer != nil {
+		providerSyncTimer.Stop()
+		providerSyncTimer = nil
+	}
+}
+
 // Returns a new provider (address for pointer reference).
 func newProvider(sf SessionFactory, storage Storage) *provider {
+	interruptProviderSyncRoutine()
 	p := &provider{
 		ca: &cache{
 			list.New(),
@@ -237,4 +247,23 @@ func (p *provider) SessionGC(checker AgeChecker) {
 			p.st.Delete(sid)
 		}
 	}
+}
+
+var ProviderSyncRoutineTime time.Duration = 10 * time.Second
+
+func (p *provider) storageSync() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	elem := p.ca.(*cache).collec.Front()
+	for {
+		if elem == nil {
+			break
+		}
+		sess := elem.Value.(*cacheNode).sess
+		p.st.Save(sess.SessionID(), p.sf.ExtractValues(sess))
+		elem = elem.Next()
+	}
+	providerSyncTimer = time.AfterFunc(ProviderSyncRoutineTime, func() {
+		p.storageSync()
+	})
 }

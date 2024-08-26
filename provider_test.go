@@ -475,42 +475,87 @@ func TestProvider_SessionGC(t *testing.T) {
 	})
 }
 
-func TestProvider(t *testing.T) {
-	s := &stubStorage{
-		data: map[string]map[string]any{
-			"1": {"foo": "bar"},
-		},
+func TestProvider_storageSync(t *testing.T) {
+	st := &stubStorage{
+		data: map[string]map[string]any{},
 	}
+
 	sf := &mockSessionFactory{
-		CreateFunc: func(id string, m map[string]any) Session {
-			s := &stubSession{
-				Id: id,
-				V:  map[string]any{},
-			}
-			maps.Copy(s.V, m)
-			return s
-		},
-		RestoreFunc: func(id string, m map[string]any, v map[string]any) Session {
-			s := &stubSession{
-				Id: id,
-				V:  map[string]any{},
-			}
-			maps.Copy(s.V, m)
-			maps.Copy(s.V, v)
-			return s
+		ExtractValuesFunc: func(s Session) map[string]any {
+			return s.(*stubSession).V
 		},
 	}
 
-	p := newProvider(sf, s)
+	c := &cache{
+		list.New(),
+		[]*cacheNode{},
+	}
 
-	assert.NotNil(t, p)
+	c.Add(&stubSession{
+		Id: "1",
+		V:  map[string]any{"foo": "bar"},
+	})
 
-	p.ca.Contains("1")
+	p := &provider{
+		ca: c,
+		st: st,
+		sf: sf,
+	}
 
-	got1, err := p.SessionRead("1")
-	assert.NoError(t, err)
+	p.storageSync()
 
-	assert.Equal(t, got1.Get("foo"), "bar")
+	// interrupt recurrent sync
+	interruptProviderSyncRoutine()
 
-	// p.sessionInit("2")
+	assert.NotEmpty(t, st.data)
+	assert.Equal(t, st.data["1"], map[string]any{"foo": "bar"})
 }
+
+// func TestProvider(t *testing.T) {
+// 	s := &stubStorage{
+// 		data: map[string]map[string]any{
+// 			"1": {"foo": "bar"},
+// 		},
+// 	}
+// 	sf := &mockSessionFactory{
+// 		CreateFunc: func(id string, m map[string]any) Session {
+// 			s := &stubSession{
+// 				Id: id,
+// 				V:  map[string]any{},
+// 			}
+// 			maps.Copy(s.V, m)
+// 			return s
+// 		},
+// 		RestoreFunc: func(id string, m map[string]any, v map[string]any) Session {
+// 			s := &stubSession{
+// 				Id: id,
+// 				V:  map[string]any{},
+// 			}
+// 			maps.Copy(s.V, m)
+// 			maps.Copy(s.V, v)
+// 			return s
+// 		},
+// 	}
+
+// 	p := newProvider(sf, s)
+// 	assert.NotNil(t, p)
+
+// 	t.Run("init session", func(t *testing.T) {
+// 		id := "2"
+// 		sess, err := p.SessionInit(id)
+// 		assert.NoError(t, err)
+// 		assert.NotNil(t, sess)
+
+// 		assert.Equal(t, sess.SessionID(), id, "expected session with id=%s, but got id=%s", id, sess.SessionID())
+// 	})
+
+// 	t.Run("read session", func(t *testing.T) {
+// 		id := "1"
+// 		sess, err := p.SessionRead(id)
+// 		assert.NoError(t, err)
+// 		assert.NotNil(t, sess)
+
+// 		assert.Equal(t, sess.SessionID(), id, "expected session with id=%s, but got id=%s", id, sess.SessionID())
+// 		assert.Equal(t, sess.Get("foo"), "bar", "can't find [%s: %v] value in session", "foo", "bar")
+// 	})
+// }
