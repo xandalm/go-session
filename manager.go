@@ -51,8 +51,6 @@ type Provider interface {
 	SessionInit(sid string) (Session, error)
 	SessionRead(sid string) (Session, error)
 	SessionDestroy(sid string) error
-	SessionPush(Session) error
-	SessionPull(Session) error
 	SessionGC(checker AgeChecker)
 }
 

@@ -215,28 +215,6 @@ func (p *provider) SessionDestroy(sid string) error {
 	return nil
 }
 
-func (p *provider) SessionPush(sess Session) error {
-	if p.st == nil {
-		return nil
-	}
-	values := p.sf.ExtractValues(sess)
-	data, _ := p.st.Read(sess.SessionID())
-	for k, v := range values {
-		data[k] = v
-	}
-	p.st.Save(sess.SessionID(), data)
-	return nil
-}
-
-func (p *provider) SessionPull(sess Session) error {
-	if p.st == nil {
-		return nil
-	}
-	data, _ := p.st.Read(sess.SessionID())
-	p.sf.OverrideValues(sess, data)
-	return nil
-}
-
 // Checks for expired sessions through storage api, and remove them.
 // The maxAge will be adapted accordingly to AgeCheckerAdapter
 func (p *provider) SessionGC(checker AgeChecker) {
