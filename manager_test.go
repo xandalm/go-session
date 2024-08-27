@@ -19,8 +19,7 @@ var dummySite = "http://site.com"
 func TestManager(t *testing.T) {
 	cookieName := "SessionID"
 	provider := &stubProvider{}
-	dummyAdapter := stubMilliAgeCheckerAdapter
-	manager := newManager(provider, cookieName, 3600, dummyAdapter)
+	manager := newManager(provider, cookieName, 3600)
 
 	assert.NotNil(t, manager)
 
@@ -101,8 +100,7 @@ func TestManager(t *testing.T) {
 
 	t.Run("panic when fail to start session", func(t *testing.T) {
 		provider := &stubFailingProvider{}
-		dummyAdapter := stubMilliAgeCheckerAdapter
-		manager := newManager(provider, cookieName, 3600, dummyAdapter)
+		manager := newManager(provider, cookieName, 3600)
 
 		defer func() {
 			r := recover()

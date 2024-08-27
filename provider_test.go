@@ -277,7 +277,7 @@ func TestProvider_SessionRead(t *testing.T) {
 	}
 
 	provider := &provider{
-		ac: stubMilliAgeCheckerAdapter(3600),
+		ac: stubMilliAgeChecker(3600),
 		ca: cache,
 		st: dummyStorage,
 		sf: sf,

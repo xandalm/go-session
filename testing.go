@@ -160,10 +160,6 @@ func (m stubMilliAgeChecker) ShouldReap(t int64) bool {
 	return diff > int64(m)
 }
 
-func stubMilliAgeCheckerAdapter(v int64) AgeChecker {
-	return stubMilliAgeChecker(v)
-}
-
 func NowTime() time.Time {
 	return time.Now()
 }

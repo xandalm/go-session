@@ -54,24 +54,18 @@ type Provider interface {
 	SessionGC()
 }
 
-type AgeChecker interface {
+type ageChecker interface {
 	// It says if the session is expired.
 	// The given value is the unix nanoseconds
 	// count until the session creation time.
 	ShouldReap(int64) bool
 }
 
-type AgeCheckerAdapter func(int64) AgeChecker
-
 type secondsAgeChecker int64
 
 func (ma secondsAgeChecker) ShouldReap(t int64) bool {
 	diff := time.Now().Unix() - (t / int64(time.Second))
 	return diff >= int64(ma)
-}
-
-var SecondsAgeCheckerAdapter AgeCheckerAdapter = func(maxAge int64) AgeChecker {
-	return secondsAgeChecker(maxAge)
 }
 
 // Manager allows to work with sessions.
@@ -90,14 +84,13 @@ type Manager struct {
 	provider   Provider
 	cookieName string
 	maxAge     int64
-	adapter    AgeCheckerAdapter
 	timer      *time.Timer
 }
 
 // Returns a new Manager (address for pointer reference).
 //
 // The provider cannot be nil and cookie name cannot be empty.
-func newManager(provider Provider, cookieName string, maxAge int64, adapter AgeCheckerAdapter) *Manager {
+func newManager(provider Provider, cookieName string, maxAge int64) *Manager {
 	if provider == nil {
 		panic("session: nil provider")
 	}
@@ -108,7 +101,6 @@ func newManager(provider Provider, cookieName string, maxAge int64, adapter AgeC
 		provider:   provider,
 		cookieName: cookieName,
 		maxAge:     maxAge,
-		adapter:    adapter,
 	}
 }
 
@@ -184,10 +176,9 @@ func Config(cookieName string, maxAge int64, sessionFactory SessionFactory, stor
 		manager.timer = nil
 	}
 	manager = newManager(
-		newProvider(SecondsAgeCheckerAdapter(maxAge), sessionFactory, storage),
+		newProvider(secondsAgeChecker(maxAge), sessionFactory, storage),
 		cookieName,
 		maxAge,
-		SecondsAgeCheckerAdapter,
 	)
 	manager.GC()
 }

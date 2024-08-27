@@ -69,7 +69,7 @@ func (c *cache) Contains(sid string) bool {
 	return has
 }
 
-func (c *cache) ExpiredSessions(checker AgeChecker) []string {
+func (c *cache) ExpiredSessions(checker ageChecker) []string {
 	var ret []string
 	elem := c.collec.Front()
 	for {
@@ -100,7 +100,7 @@ var ReservedFields = []string{"ct", "at"}
 // Provider that communicates with storage api to init, read and destroy sessions.
 type provider struct {
 	mu sync.Mutex     // Mutex
-	ac AgeChecker     // Expiration checker
+	ac ageChecker     // Expiration checker
 	ca *cache         // Cached sessions
 	st Storage        // Session storage (persistence, normally)
 	sf SessionFactory // Session factory for session analysis
@@ -116,7 +116,7 @@ func interruptProviderSyncRoutine() {
 }
 
 // Returns a new provider (address for pointer reference).
-func newProvider(ac AgeChecker, sf SessionFactory, storage Storage) *provider {
+func newProvider(ac ageChecker, sf SessionFactory, storage Storage) *provider {
 	interruptProviderSyncRoutine()
 	p := &provider{
 		ac: ac,
