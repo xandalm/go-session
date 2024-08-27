@@ -277,6 +277,7 @@ func TestProvider_SessionRead(t *testing.T) {
 	}
 
 	provider := &provider{
+		ac: stubMilliAgeCheckerAdapter(3600),
 		ca: cache,
 		st: dummyStorage,
 		sf: sf,
@@ -367,6 +368,7 @@ func TestProvider_SessionGC(t *testing.T) {
 		}
 
 		provider := &provider{
+			ac: stubMilliAgeChecker(1),
 			ca: cache,
 			st: storage,
 		}
@@ -390,7 +392,7 @@ func TestProvider_SessionGC(t *testing.T) {
 		})
 		storage.data[sid2] = map[string]any{}
 
-		provider.SessionGC(stubMilliAgeChecker(1))
+		provider.SessionGC()
 
 		if cache.Contains(sid1) {
 			t.Fatal("didn't destroy session from cache")

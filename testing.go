@@ -86,7 +86,7 @@ func (p *stubProvider) SessionDestroy(sid string) error {
 	return nil
 }
 
-func (p *stubProvider) SessionGC(checker AgeChecker) {}
+func (p *stubProvider) SessionGC() {}
 
 type stubFailingProvider struct{}
 
@@ -102,7 +102,7 @@ func (p *stubFailingProvider) SessionDestroy(sid string) error {
 	return errFoo
 }
 
-func (p *stubFailingProvider) SessionGC(checker AgeChecker) {}
+func (p *stubFailingProvider) SessionGC() {}
 
 type stubStorage struct {
 	mu   sync.Mutex

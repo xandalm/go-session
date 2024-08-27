@@ -95,20 +95,13 @@ func (c *cache) Get(sid string) Session {
 	return nil
 }
 
-type cacheI interface {
-	Add(sess Session)
-	Contains(sid string) bool
-	ExpiredSessions(checker AgeChecker) []string
-	Remove(sid string)
-	Get(sid string) Session
-}
-
 var ReservedFields = []string{"ct", "at"}
 
 // Provider that communicates with storage api to init, read and destroy sessions.
 type provider struct {
 	mu sync.Mutex     // Mutex
-	ca cacheI         // Cached sessions
+	ac AgeChecker     // Expiration checker
+	ca *cache         // Cached sessions
 	st Storage        // Session storage (persistence, normally)
 	sf SessionFactory // Session factory for session analysis
 }
@@ -123,9 +116,10 @@ func interruptProviderSyncRoutine() {
 }
 
 // Returns a new provider (address for pointer reference).
-func newProvider(sf SessionFactory, storage Storage) *provider {
+func newProvider(ac AgeChecker, sf SessionFactory, storage Storage) *provider {
 	interruptProviderSyncRoutine()
 	p := &provider{
+		ac: ac,
 		ca: &cache{
 			list.New(),
 			[]*cacheNode{},
@@ -148,6 +142,7 @@ func newProvider(sf SessionFactory, storage Storage) *provider {
 		delete(data, "ct")
 		p.ca.Add(p.sf.Restore(sid, meta, data))
 	}
+	p.storageSync()
 	return p
 }
 
@@ -197,7 +192,10 @@ func (p *provider) SessionRead(sid string) (Session, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if sess := p.ca.Get(sid); sess != nil {
-		return sess, nil
+		if !p.ac.ShouldReap(sess.Get("ct").(int64)) {
+			return sess, nil
+		}
+		p.ca.Remove(sid)
 	}
 	return p.sessionInit(sid)
 }
@@ -217,10 +215,10 @@ func (p *provider) SessionDestroy(sid string) error {
 
 // Checks for expired sessions through storage api, and remove them.
 // The maxAge will be adapted accordingly to AgeCheckerAdapter
-func (p *provider) SessionGC(checker AgeChecker) {
+func (p *provider) SessionGC() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	for _, sid := range p.ca.ExpiredSessions(checker) {
+	for _, sid := range p.ca.ExpiredSessions(p.ac) {
 		if p.st != nil {
 			p.st.Delete(sid)
 		}
@@ -232,7 +230,7 @@ var ProviderSyncRoutineTime time.Duration = 10 * time.Second
 func (p *provider) storageSync() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	elem := p.ca.(*cache).collec.Front()
+	elem := p.ca.collec.Front()
 	for {
 		if elem == nil {
 			break

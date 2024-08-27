@@ -139,10 +139,9 @@ func getCookieFromResponse(res *httptest.ResponseRecorder) (cookie map[string]st
 	return
 }
 
-func TestReset(t *testing.T) {
+func TestConfig(t *testing.T) {
 	cookieName := "SESSION"
 	maxAge := int64(60)
-	adapter := SecondsAgeCheckerAdapter
 	storage := newStubStorage()
 	sessionFactory := &mockSessionFactory{
 		CreateFunc: func(id string, m map[string]any) Session {
@@ -168,7 +167,7 @@ func TestReset(t *testing.T) {
 			return maps.Clone(sess.V)
 		},
 	}
-	Config(cookieName, maxAge, adapter, sessionFactory, storage)
+	Config(cookieName, maxAge, sessionFactory, storage)
 
 	assert.NotNil(t, manager)
 }

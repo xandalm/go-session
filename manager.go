@@ -51,7 +51,7 @@ type Provider interface {
 	SessionInit(sid string) (Session, error)
 	SessionRead(sid string) (Session, error)
 	SessionDestroy(sid string) error
-	SessionGC(checker AgeChecker)
+	SessionGC()
 }
 
 type AgeChecker interface {
@@ -168,7 +168,7 @@ func (m *Manager) DestroySession(w http.ResponseWriter, r *http.Request) {
 
 // Creates a routine to check for expired sessions and remove them.
 func (m *Manager) GC() {
-	m.provider.SessionGC(m.adapter(m.maxAge))
+	m.provider.SessionGC()
 	m.timer = time.AfterFunc(time.Duration(m.maxAge), func() {
 		m.GC()
 	})
@@ -178,15 +178,16 @@ var manager *Manager
 
 // Configure the session cookie name, the session expiration
 // time and where the sessions values will be held (storage).
-func Config(cookieName string, maxAge int64, adapter AgeCheckerAdapter, sessionFactory SessionFactory, storage Storage) {
+func Config(cookieName string, maxAge int64, sessionFactory SessionFactory, storage Storage) {
 	if manager != nil && manager.timer != nil {
 		manager.timer.Stop()
+		manager.timer = nil
 	}
 	manager = newManager(
-		newProvider(sessionFactory, storage),
+		newProvider(SecondsAgeCheckerAdapter(maxAge), sessionFactory, storage),
 		cookieName,
 		maxAge,
-		adapter,
+		SecondsAgeCheckerAdapter,
 	)
 	manager.GC()
 }
