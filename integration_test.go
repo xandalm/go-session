@@ -4,11 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -16,20 +14,19 @@ import (
 
 	"github.com/xandalm/go-session"
 	"github.com/xandalm/go-session/filesystem"
-	"github.com/xandalm/go-session/memory"
 )
 
-type mockServer struct {
+type stubServer struct {
 	players []string
 }
 
-func newServer() *mockServer {
-	return &mockServer{
+func newServer() *stubServer {
+	return &stubServer{
 		make([]string, 0),
 	}
 }
 
-func (s *mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s *stubServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	sess := session.Start(w, r)
 	if sess == nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -38,6 +35,9 @@ func (s *mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/login":
 		s.handleLogIn(w, r, sess)
+	case "/logout":
+		session.Destroy(w, r)
+		w.WriteHeader(http.StatusOK)
 	case "/players":
 		s.handleGetOnlinePlayers(w, r, sess)
 	case "/start":
@@ -51,20 +51,25 @@ func (s *mockServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *mockServer) handleLogIn(w http.ResponseWriter, r *http.Request, sess session.Session) {
+func (s *stubServer) handleLogIn(w http.ResponseWriter, r *http.Request, sess session.Session) {
 	username := r.FormValue("username")
 	if username == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	sess.Set("username", username)
-	sess.Set("logged", true)
+	if err := sess.Set("username", username); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if err := sess.Set("logged", true); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
 	s.players = append(s.players, username)
 }
 
-func (s *mockServer) handleGetOnlinePlayers(w http.ResponseWriter, _ *http.Request, sess session.Session) {
-
+func (s *stubServer) handleGetOnlinePlayers(w http.ResponseWriter, _ *http.Request, sess session.Session) {
 	if isLogged, ok := sess.Get("logged").(bool); !ok || !isLogged {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -73,7 +78,7 @@ func (s *mockServer) handleGetOnlinePlayers(w http.ResponseWriter, _ *http.Reque
 	fmt.Fprint(w, strings.Join(s.players, ","))
 }
 
-func (s *mockServer) handleStartGame(w http.ResponseWriter, _ *http.Request, sess session.Session) {
+func (s *stubServer) handleStartGame(w http.ResponseWriter, _ *http.Request, sess session.Session) {
 	logged, ok := sess.Get("logged").(bool)
 	if !ok || !logged {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -83,7 +88,7 @@ func (s *mockServer) handleStartGame(w http.ResponseWriter, _ *http.Request, ses
 	sess.Set("score", 0)
 }
 
-func (s *mockServer) handleLeaveGame(w http.ResponseWriter, _ *http.Request, sess session.Session) {
+func (s *stubServer) handleLeaveGame(w http.ResponseWriter, _ *http.Request, sess session.Session) {
 	logged, ok := sess.Get("logged").(bool)
 	if !ok || !logged {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -93,7 +98,7 @@ func (s *mockServer) handleLeaveGame(w http.ResponseWriter, _ *http.Request, ses
 	sess.Delete("score")
 }
 
-func (s *mockServer) handleScore(w http.ResponseWriter, r *http.Request, sess session.Session) {
+func (s *stubServer) handleScore(w http.ResponseWriter, r *http.Request, sess session.Session) {
 	logged, ok := sess.Get("logged").(bool)
 	if !ok || !logged {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -102,7 +107,7 @@ func (s *mockServer) handleScore(w http.ResponseWriter, r *http.Request, sess se
 
 	score, ok := sess.Get("score").(int)
 	if !ok {
-		w.WriteHeader(http.StatusUnauthorized)
+		w.WriteHeader(http.StatusForbidden)
 		return
 	}
 
@@ -179,99 +184,126 @@ func (m *stubCookieManager) Cookies() []*http.Cookie {
 	return ret
 }
 
+const sessionCookieName = "SESSION_ID"
+
+func parseCookie(cookie map[string]string) *http.Cookie {
+	maxAge, _ := strconv.Atoi(cookie["Max-Age"])
+	httpOnly, _ := strconv.ParseBool(cookie["HttpOnly"])
+	c := &http.Cookie{
+		Name:     sessionCookieName,
+		Value:    cookie[sessionCookieName],
+		Path:     cookie["Path"],
+		HttpOnly: httpOnly,
+		MaxAge:   maxAge,
+	}
+	expires, hasExpires := cookie["Expires"]
+	if hasExpires {
+		c.Expires, _ = time.Parse(time.RFC1123, expires)
+	}
+	return c
+}
+
 func performTest(t *testing.T) {
 	t.Helper()
 
 	server := newServer()
 
-	cookieManager := newStubCookieManager()
-
-	parseCookie := func(cookie map[string]string) *http.Cookie {
-		maxAge, _ := strconv.Atoi(cookie["Max-Age"])
-		httpOnly, _ := strconv.ParseBool(cookie["HttpOnly"])
-		c := &http.Cookie{
-			Name:     "SESSION_ID",
-			Value:    cookie["SESSION_ID"],
-			Path:     cookie["Path"],
-			HttpOnly: httpOnly,
-			MaxAge:   maxAge,
-		}
-		expires, hasExpires := cookie["Expires"]
-		if hasExpires {
-			c.Expires, _ = time.Parse(time.RFC1123, expires)
-		}
-		return c
-	}
-
 	t.Run("login", func(t *testing.T) {
+
+		cookieManager := newStubCookieManager()
 
 		form := url.Values{}
 		form.Set("username", "alex")
 
-		response := doPost(server, "http://foo.com/login", strings.NewReader(form.Encode()), map[string]string{"Content-Type": "application/x-www-form-urlencoded"}, nil)
+		body := strings.NewReader(form.Encode())
+		response := doPost(server, "http://foo.com/login", body, map[string]string{"Content-Type": "application/x-www-form-urlencoded"}, nil)
 
 		assertHTTPStatus(t, response, http.StatusOK)
 		cookie := parseCookie(getCookieFromResponse(response))
 		cookieManager.SetCookie(cookie)
+
+		t.Run("get players", func(t *testing.T) {
+
+			cookies := cookieManager.Cookies()
+			response := doGet(server, "http://foo.com/players", nil, nil, cookies)
+
+			assertHTTPStatus(t, response, http.StatusOK)
+			got := response.Body.String()
+			want := "alex"
+
+			if got != want {
+				t.Errorf("got players %s, but want %s", got, want)
+			}
+		})
+
+		t.Run("start game", func(t *testing.T) {
+
+			cookies := cookieManager.Cookies()
+			response := doPost(server, "http://foo.com/start", nil, nil, cookies)
+
+			assertHTTPStatus(t, response, http.StatusOK)
+		})
+
+		t.Run("score in the game", func(t *testing.T) {
+
+			cookies := cookieManager.Cookies()
+			response := doPost(server, "http://foo.com/score", nil, nil, cookies)
+
+			assertHTTPStatus(t, response, http.StatusOK)
+		})
+
+		t.Run("get score", func(t *testing.T) {
+
+			cookies := cookieManager.Cookies()
+			response := doGet(server, "http://foo.com/score", nil, nil, cookies)
+
+			assertHTTPStatus(t, response, http.StatusOK)
+
+			got := response.Body.String()
+			want := "1"
+
+			if got != want {
+				t.Errorf("got score %s, but want %s", got, want)
+			}
+		})
+
+		t.Run("leave from game", func(t *testing.T) {
+
+			cookies := cookieManager.Cookies()
+			response := doPost(server, "http://foo.com/leave", nil, nil, cookies)
+
+			assertHTTPStatus(t, response, http.StatusOK)
+		})
+
+		t.Run("logout", func(t *testing.T) {
+
+			cookies := cookieManager.Cookies()
+			response := doGet(server, "http://foo.com/logout", nil, nil, cookies)
+
+			assertHTTPStatus(t, response, http.StatusOK)
+
+			response = doPost(server, "http://foo.com/start", nil, nil, cookies)
+			assertHTTPStatus(t, response, http.StatusUnauthorized)
+		})
 	})
+
+	cookieManager := newStubCookieManager()
 
 	form := url.Values{}
 	form.Set("username", "andre")
 
-	doPost(server, "http://foo.com/login", strings.NewReader(form.Encode()), map[string]string{"Content-Type": "application/x-www-form-urlencoded"}, nil)
+	response := doPost(server, "http://foo.com/login", strings.NewReader(form.Encode()), map[string]string{"Content-Type": "application/x-www-form-urlencoded"}, nil)
 
-	t.Run("get players", func(t *testing.T) {
+	assertHTTPStatus(t, response, http.StatusOK)
+	cookie := parseCookie(getCookieFromResponse(response))
+	cookieManager.SetCookie(cookie)
 
-		response := doGet(server, "http://foo.com/players", nil, nil, cookieManager.Cookies())
+	t.Run("logoff player by expired session", func(t *testing.T) {
 
-		assertHTTPStatus(t, response, http.StatusOK)
-		got := response.Body.String()
-		want := strings.Join(server.players, ",")
+		time.Sleep(1 * time.Second)
 
-		if got != want {
-			t.Errorf("got players %s, but want %s", got, want)
-		}
-	})
-
-	t.Run("start game", func(t *testing.T) {
-
-		response := doPost(server, "http://foo.com/start", nil, nil, cookieManager.Cookies())
-
-		assertHTTPStatus(t, response, http.StatusOK)
-	})
-
-	t.Run("score in the game", func(t *testing.T) {
-
-		response := doPost(server, "http://foo.com/score", nil, nil, cookieManager.Cookies())
-
-		assertHTTPStatus(t, response, http.StatusOK)
-	})
-
-	t.Run("get score", func(t *testing.T) {
-
-		response := doGet(server, "http://foo.com/score", nil, nil, cookieManager.Cookies())
-
-		assertHTTPStatus(t, response, http.StatusOK)
-
-		got := response.Body.String()
-		want := "1"
-
-		if got != want {
-			t.Errorf("got score %s, but want %s", got, want)
-		}
-	})
-
-	t.Run("leave from game", func(t *testing.T) {
-
-		response := doPost(server, "http://foo.com/leave", nil, nil, cookieManager.Cookies())
-
-		assertHTTPStatus(t, response, http.StatusOK)
-	})
-
-	t.Run("logoff player after session expires", func(t *testing.T) {
-		time.Sleep(2 * time.Second)
-
-		response := doGet(server, "http://foo.com/players", nil, nil, cookieManager.Cookies())
+		cookies := cookieManager.Cookies()
+		response := doGet(server, "http://foo.com/start", nil, nil, cookies)
 
 		assertHTTPStatus(t, response, http.StatusUnauthorized)
 	})
@@ -349,25 +381,84 @@ func doPost(handler http.Handler, url string, body io.Reader, headers map[string
 	return response
 }
 
-func TestSessionsWithMemoryStorage(t *testing.T) {
-	session.Config("SESSION_ID", 1, session.SecondsAgeCheckerAdapter, memory.NewStorage())
+func TestSessionsWithFileSystemStorage(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	path := "sessions_from_integration_test"
+	session.Config("SESSION_ID", 1, session.NewSessionFactory(), filesystem.NewStorage(path, ""))
 
 	performTest(t)
 }
 
-func TestSessionsWithFileSystemStorage(t *testing.T) {
+func BenchmarkOnFileSystemStorage(b *testing.B) {
 	path := "sessions_from_integration_test"
-	session.Config("SESSION_ID", 1, session.SecondsAgeCheckerAdapter, filesystem.NewStorage(path, ""))
+	session.ProviderSyncRoutineTime = 1 * time.Second
+	session.Config("SESSION_ID", 3600, session.NewSessionFactory(), filesystem.NewStorage(path, ""))
+	h := newServer()
 
-	performTest(t)
+	init := func(username string) *stubCookieManager {
+		cm := newStubCookieManager()
+		form := url.Values{}
+		form.Set("username", username)
 
-	t.Cleanup(func() {
-		// suspected that the wait for the request context to be done
-		// (at manager.StartSession) is causing concurrence error during the test
-		time.Sleep(1 * time.Second)
+		body := strings.NewReader(form.Encode())
+		res := doPost(h, "http://foo.com/login", body, map[string]string{"Content-Type": "application/x-www-form-urlencoded"}, nil)
+		assertHTTPStatus(b, res, http.StatusOK)
 
-		if err := os.RemoveAll(path); err != nil {
-			log.Fatalf("cannot clean up after test, %v", err)
+		cookie := parseCookie(getCookieFromResponse(res))
+		cm.SetCookie(cookie)
+
+		cookies := cm.Cookies()
+		res = doPost(h, "http://foo.com/start", nil, nil, cookies)
+
+		if res.Code != http.StatusOK {
+			fmt.Println(username)
 		}
-	})
+
+		assertHTTPStatus(b, res, http.StatusOK)
+		return cm
+	}
+
+	logout := func(cm *stubCookieManager) {
+		cookies := cm.Cookies()
+		res := doGet(h, "http://foo.com/logout", nil, nil, cookies)
+		assertHTTPStatus(b, res, http.StatusOK)
+	}
+
+	score := func(cm *stubCookieManager, ch chan int8) {
+		cookies := cm.Cookies()
+		res := doPost(h, "http://foo.com/score", nil, nil, cookies)
+		assertHTTPStatus(b, res, http.StatusOK)
+		ch <- 1
+	}
+
+	players := []*stubCookieManager{
+		init("john"),
+		init("anie"),
+		init("hugo"),
+		init("riya"),
+	}
+
+	ch := make(chan int8, b.N)
+
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		go score(players[0], ch)
+		go score(players[1], ch)
+		go score(players[2], ch)
+		go score(players[3], ch)
+	}
+	for i := 0; i < b.N; i++ {
+		<-ch
+		<-ch
+		<-ch
+		<-ch
+	}
+	b.StopTimer()
+
+	logout(players[0])
+	logout(players[1])
+	logout(players[2])
+	logout(players[3])
 }

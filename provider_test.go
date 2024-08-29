@@ -442,7 +442,7 @@ func TestProvider_storageSync(t *testing.T) {
 	p.storageSync()
 
 	// interrupt recurrent sync
-	interruptProviderSyncRoutine()
+	p.interruptSyncRoutine()
 
 	assert.NotEmpty(t, st.data)
 	assert.Equal(t, st.data["1"], map[string]any{"foo": "bar"})

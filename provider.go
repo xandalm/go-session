@@ -40,12 +40,15 @@ func (c *cache) find(sid string) *cacheNode {
 }
 
 func (c *cache) Add(sess Session) {
-	node := &cacheNode{
+	n := &cacheNode{
 		sess, 0, nil,
 	}
-	node.anchor = c.collec.PushBack(node)
-	node.idxPos, _ = c.findIndex(sess.SessionID())
-	c.idx = slices.Insert(c.idx, node.idxPos, node)
+	n.anchor = c.collec.PushBack(n)
+	n.idxPos, _ = c.findIndex(sess.SessionID())
+	c.idx = slices.Insert(c.idx, n.idxPos, n)
+	for i := n.idxPos + 1; i < len(c.idx); i++ {
+		c.idx[i].idxPos += 1
+	}
 }
 
 func (c *cache) Remove(sid string) {
@@ -104,21 +107,27 @@ type provider struct {
 	ca *cache         // Cached sessions
 	st Storage        // Session storage (persistence, normally)
 	sf SessionFactory // Session factory for session analysis
+	t  *time.Timer
 }
 
-var providerSyncTimer *time.Timer // must be stopped on new provider creation
+var _p *provider = nil
 
-func interruptProviderSyncRoutine() {
-	if providerSyncTimer != nil {
-		providerSyncTimer.Stop()
-		providerSyncTimer = nil
+func (p *provider) interruptSyncRoutine() {
+	if p == nil || p.t == nil {
+		return
 	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.t.Stop()
+	p.t = nil
 }
 
 // Returns a new provider (address for pointer reference).
 func newProvider(ac ageChecker, sf SessionFactory, storage Storage) *provider {
-	interruptProviderSyncRoutine()
-	p := &provider{
+	if _p != nil {
+		_p.interruptSyncRoutine()
+	}
+	_p = &provider{
 		ac: ac,
 		ca: &cache{
 			list.New(),
@@ -127,6 +136,9 @@ func newProvider(ac ageChecker, sf SessionFactory, storage Storage) *provider {
 		sf: sf,
 		st: storage,
 	}
+	if storage == nil {
+		return _p
+	}
 	sids, err := storage.List()
 	if err != nil {
 		panic("session: unable to load storage sessions")
@@ -134,16 +146,17 @@ func newProvider(ac ageChecker, sf SessionFactory, storage Storage) *provider {
 	for _, sid := range sids {
 		data, err := storage.Read(sid)
 		if err != nil {
-			panic("session: unable to load storage sessions")
+			storage.Delete(sid)
+			continue
 		}
 		meta := map[string]any{
 			"ct": data["ct"],
 		}
 		delete(data, "ct")
-		p.ca.Add(p.sf.Restore(sid, meta, data))
+		_p.ca.Add(_p.sf.Restore(sid, meta, data))
 	}
-	p.storageSync()
-	return p
+	_p.storageSync()
+	return _p
 }
 
 var (
@@ -239,7 +252,7 @@ func (p *provider) storageSync() {
 		p.st.Save(sess.SessionID(), p.sf.ExtractValues(sess))
 		elem = elem.Next()
 	}
-	providerSyncTimer = time.AfterFunc(ProviderSyncRoutineTime, func() {
+	p.t = time.AfterFunc(ProviderSyncRoutineTime, func() {
 		p.storageSync()
 	})
 }
