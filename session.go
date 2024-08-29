@@ -84,9 +84,7 @@ func (s *session) Delete(key string) error {
 	return nil
 }
 
-type sessionFactory struct {
-	pkm map[string]int8
-}
+type sessionFactory struct{}
 
 // Create implements SessionFactory.
 func (sf *sessionFactory) Create(id string, m map[string]any) Session {
@@ -128,11 +126,7 @@ func (sf *sessionFactory) ExtractValues(sess Session) map[string]any {
 	return maps.Clone(sess.(*session).v)
 }
 
-func NewSessionFactory() SessionFactory {
-	return &sessionFactory{
-		pkm: make(map[string]int8),
-	}
-}
+var DefaultSessionFactory SessionFactory = &sessionFactory{}
 
 func init() {
 	protectedKeyNames = make(map[string]int8)

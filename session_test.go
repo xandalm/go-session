@@ -77,7 +77,7 @@ func TestSession_Delete(t *testing.T) {
 }
 
 func TestSessionFactory(t *testing.T) {
-	var sf SessionFactory = NewSessionFactory()
+	var sf SessionFactory = DefaultSessionFactory
 
 	assert.NotNil(t, sf)
 

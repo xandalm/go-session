@@ -386,7 +386,7 @@ func TestSessionsWithFileSystemStorage(t *testing.T) {
 		t.Skip()
 	}
 	path := "sessions_from_integration_test"
-	session.Config("SESSION_ID", 1, session.NewSessionFactory(), filesystem.NewStorage(path, ""))
+	session.Config("SESSION_ID", 1, session.DefaultSessionFactory, filesystem.NewStorage(path, ""))
 
 	performTest(t)
 }
@@ -394,7 +394,7 @@ func TestSessionsWithFileSystemStorage(t *testing.T) {
 func BenchmarkOnFileSystemStorage(b *testing.B) {
 	path := "sessions_from_integration_test"
 	session.ProviderSyncRoutineTime = 1 * time.Second
-	session.Config("SESSION_ID", 3600, session.NewSessionFactory(), filesystem.NewStorage(path, ""))
+	session.Config("SESSION_ID", 3600, session.DefaultSessionFactory, filesystem.NewStorage(path, ""))
 	h := newServer()
 
 	init := func(username string) *stubCookieManager {
