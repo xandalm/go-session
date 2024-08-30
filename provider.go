@@ -123,21 +123,21 @@ type provider struct {
 
 var _p *provider = nil
 
-func (p *provider) interruptSyncRoutine() {
-	if p == nil || p.t == nil {
-		return
-	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.t.Stop()
-	p.t = nil
-}
+// func (p *provider) interruptSyncRoutine() {
+// 	if p == nil || p.t == nil {
+// 		return
+// 	}
+// 	p.mu.Lock()
+// 	defer p.mu.Unlock()
+// 	p.t.Stop()
+// 	p.t = nil
+// }
 
 // Returns a new provider (address for pointer reference).
 func newProvider(ac ageChecker, sf SessionFactory, storage Storage) *provider {
-	if _p != nil {
-		_p.interruptSyncRoutine()
-	}
+	// if _p != nil {
+	// 	_p.interruptSyncRoutine()
+	// }
 	_p = &provider{
 		ac: ac,
 		ca: &cache{
@@ -163,8 +163,8 @@ func newProvider(ac ageChecker, sf SessionFactory, storage Storage) *provider {
 		meta := map[string]any{
 			"ct": data["ct"],
 		}
-		delete(data, "ct")
-		_p.ca.Add(_p.sf.Restore(sid, meta, data))
+		// delete(data, "ct")
+		_p.ca.Add(_p.sf.Restore(sid, meta, nil))
 	}
 	// _p.storageSync()
 	return _p
@@ -224,10 +224,16 @@ func (p *provider) SessionRead(sid string) (Session, error) {
 		return p.sessionInit(sid)
 	}
 	if info.sess == nil {
+		data, err := p.st.Read(sid)
+		if err != nil {
+			p.ca.Remove(sid)
+			return p.sessionInit(sid)
+		}
 		meta := map[string]any{
 			"ct": info.ct,
 		}
-		return p.sf.Restore(info.id, meta, nil), nil
+		delete(data, "ct")
+		return p.sf.Restore(info.id, meta, data), nil
 	}
 	return info.sess, nil
 }
