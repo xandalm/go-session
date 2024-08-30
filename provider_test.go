@@ -26,9 +26,14 @@ func TestCache_Add(t *testing.T) {
 			t.Fatal("didn't add session on cache collection")
 		}
 
-		got := c.collec.Front().Value.(*cacheNode).sess.(*stubSession)
+		got := c.collec.Front().Value.(*cacheNode).info
+		want := sessionInfo{
+			sess,
+			sess.SessionID(),
+			sess.CreatedAt,
+		}
 
-		assert.Equal(t, got, sess)
+		assert.Equal(t, *got, want)
 
 		t.Run("add in sid sorted index", func(t *testing.T) {
 			if len(c.idx) < 1 {
@@ -39,19 +44,24 @@ func TestCache_Add(t *testing.T) {
 
 			assert.NotNil(t, node)
 
-			got := node.sess.(*stubSession)
+			got := node.info
 
-			assert.Equal(t, got, sess)
+			assert.Equal(t, *got, want)
 		})
 
 	})
 
 	t.Run("keep sid index sorted", func(t *testing.T) {
 
+		sess := &stubSession{
+			Id:        "3",
+			CreatedAt: NowTimeNanoseconds(),
+		}
 		node := &cacheNode{
-			sess: &stubSession{
-				Id:        "3",
-				CreatedAt: NowTimeNanoseconds(),
+			info: &sessionInfo{
+				sess: sess,
+				id:   sess.Id,
+				ct:   sess.CreatedAt,
 			},
 		}
 
@@ -76,7 +86,7 @@ func TestCache_Add(t *testing.T) {
 			t.Fatal("didn't add session in sid sorted index")
 		}
 
-		if c.idx[0].sess.(*stubSession).Id != "1" {
+		if c.idx[0].info.id != "1" {
 			t.Errorf("sid sorted index isn't sorted")
 		}
 	})
@@ -84,10 +94,15 @@ func TestCache_Add(t *testing.T) {
 
 func TestCache_Contains(t *testing.T) {
 
+	sess := &stubSession{
+		Id:        "1",
+		CreatedAt: NowTimeNanoseconds(),
+	}
 	node := &cacheNode{
-		sess: &stubSession{
-			Id:        "1",
-			CreatedAt: NowTimeNanoseconds(),
+		info: &sessionInfo{
+			sess: sess,
+			id:   sess.Id,
+			ct:   sess.CreatedAt,
 		},
 	}
 
@@ -120,10 +135,15 @@ func TestCache_Contains(t *testing.T) {
 
 func TestCache_Remove(t *testing.T) {
 
+	sess := &stubSession{
+		Id:        "1",
+		CreatedAt: NowTimeNanoseconds(),
+	}
 	node := &cacheNode{
-		sess: &stubSession{
-			Id:        "1",
-			CreatedAt: NowTimeNanoseconds(),
+		info: &sessionInfo{
+			sess: sess,
+			id:   sess.Id,
+			ct:   sess.CreatedAt,
 		},
 	}
 
@@ -150,20 +170,31 @@ func TestCache_ExpiredSessions(t *testing.T) {
 
 	collec := list.New()
 
+	sess1 := &stubSession{
+		Id:        "1",
+		V:         map[string]any{},
+		CreatedAt: NowTimeNanoseconds(),
+	}
 	node1 := &cacheNode{
-		sess: &stubSession{
-			Id:        "1",
-			CreatedAt: NowTimeNanoseconds(),
+		info: &sessionInfo{
+			sess1,
+			sess1.Id,
+			sess1.CreatedAt,
 		},
 	}
 
 	time.Sleep(10 * time.Millisecond)
 
+	sess2 := &stubSession{
+		Id:        "2",
+		V:         map[string]any{},
+		CreatedAt: NowTimeNanoseconds(),
+	}
 	node2 := &cacheNode{
-		sess: &stubSession{
-			Id:        "2",
-			V:         map[string]any{},
-			CreatedAt: NowTimeNanoseconds(),
+		info: &sessionInfo{
+			sess2,
+			sess2.Id,
+			sess2.CreatedAt,
 		},
 	}
 
@@ -412,87 +443,38 @@ func TestProvider_SessionGC(t *testing.T) {
 	})
 }
 
-func TestProvider_storageSync(t *testing.T) {
-	st := &stubStorage{
-		data: map[string]map[string]any{},
-	}
-
-	sf := &mockSessionFactory{
-		ExtractValuesFunc: func(s Session) map[string]any {
-			return s.(*stubSession).V
-		},
-	}
-
-	c := &cache{
-		list.New(),
-		[]*cacheNode{},
-	}
-
-	c.Add(&stubSession{
-		Id: "1",
-		V:  map[string]any{"foo": "bar"},
-	})
-
-	p := &provider{
-		ca: c,
-		st: st,
-		sf: sf,
-	}
-
-	p.storageSync()
-
-	// interrupt recurrent sync
-	p.interruptSyncRoutine()
-
-	assert.NotEmpty(t, st.data)
-	assert.Equal(t, st.data["1"], map[string]any{"foo": "bar"})
-}
-
-// func TestProvider(t *testing.T) {
-// 	s := &stubStorage{
-// 		data: map[string]map[string]any{
-// 			"1": {"foo": "bar"},
-// 		},
+// func TestProvider_storageSync(t *testing.T) {
+// 	st := &stubStorage{
+// 		data: map[string]map[string]any{},
 // 	}
+
 // 	sf := &mockSessionFactory{
-// 		CreateFunc: func(id string, m map[string]any) Session {
-// 			s := &stubSession{
-// 				Id: id,
-// 				V:  map[string]any{},
-// 			}
-// 			maps.Copy(s.V, m)
-// 			return s
-// 		},
-// 		RestoreFunc: func(id string, m map[string]any, v map[string]any) Session {
-// 			s := &stubSession{
-// 				Id: id,
-// 				V:  map[string]any{},
-// 			}
-// 			maps.Copy(s.V, m)
-// 			maps.Copy(s.V, v)
-// 			return s
+// 		ExtractValuesFunc: func(s Session) map[string]any {
+// 			return s.(*stubSession).V
 // 		},
 // 	}
 
-// 	p := newProvider(sf, s)
-// 	assert.NotNil(t, p)
+// 	c := &cache{
+// 		list.New(),
+// 		[]*cacheNode{},
+// 	}
 
-// 	t.Run("init session", func(t *testing.T) {
-// 		id := "2"
-// 		sess, err := p.SessionInit(id)
-// 		assert.NoError(t, err)
-// 		assert.NotNil(t, sess)
-
-// 		assert.Equal(t, sess.SessionID(), id, "expected session with id=%s, but got id=%s", id, sess.SessionID())
+// 	c.Add(&stubSession{
+// 		Id: "1",
+// 		V:  map[string]any{"foo": "bar"},
 // 	})
 
-// 	t.Run("read session", func(t *testing.T) {
-// 		id := "1"
-// 		sess, err := p.SessionRead(id)
-// 		assert.NoError(t, err)
-// 		assert.NotNil(t, sess)
+// 	p := &provider{
+// 		ca: c,
+// 		st: st,
+// 		sf: sf,
+// 	}
 
-// 		assert.Equal(t, sess.SessionID(), id, "expected session with id=%s, but got id=%s", id, sess.SessionID())
-// 		assert.Equal(t, sess.Get("foo"), "bar", "can't find [%s: %v] value in session", "foo", "bar")
-// 	})
+// 	p.storageSync()
+
+// 	// interrupt recurrent sync
+// 	p.interruptSyncRoutine()
+
+// 	assert.NotEmpty(t, st.data)
+// 	assert.Equal(t, st.data["1"], map[string]any{"foo": "bar"})
 // }

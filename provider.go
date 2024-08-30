@@ -8,8 +8,14 @@ import (
 	"time"
 )
 
+type sessionInfo struct {
+	sess Session
+	id   string
+	ct   int64
+}
+
 type cacheNode struct {
-	sess   Session
+	info   *sessionInfo
 	idxPos int
 	anchor *list.Element
 }
@@ -21,10 +27,10 @@ type cache struct {
 
 func (c *cache) findIndex(sid string) (int, bool) {
 	return slices.BinarySearchFunc(c.idx, sid, func(in *cacheNode, s string) int {
-		if in.sess.SessionID() < s {
+		if in.info.id < s {
 			return -1
 		}
-		if in.sess.SessionID() > s {
+		if in.info.id > s {
 			return 1
 		}
 		return 0
@@ -40,8 +46,13 @@ func (c *cache) find(sid string) *cacheNode {
 }
 
 func (c *cache) Add(sess Session) {
+	info := &sessionInfo{
+		sess,
+		sess.SessionID(),
+		sess.Get("ct").(int64),
+	}
 	n := &cacheNode{
-		sess, 0, nil,
+		info, 0, nil,
 	}
 	n.anchor = c.collec.PushBack(n)
 	n.idxPos, _ = c.findIndex(sess.SessionID())
@@ -80,20 +91,20 @@ func (c *cache) ExpiredSessions(checker ageChecker) []string {
 			break
 		}
 		node := elem.Value.(*cacheNode)
-		ct := node.sess.Get("ct").(int64)
+		ct := node.info.ct
 		if !checker.ShouldReap(ct) {
 			break
 		}
 		c.remove(node)
-		ret = append(ret, node.sess.SessionID())
+		ret = append(ret, node.info.id)
 		elem = elem.Next()
 	}
 	return ret
 }
 
-func (c *cache) Get(sid string) Session {
+func (c *cache) Get(sid string) *sessionInfo {
 	if found := c.find(sid); found != nil {
-		return found.sess
+		return found.info
 	}
 	return nil
 }
@@ -155,7 +166,7 @@ func newProvider(ac ageChecker, sf SessionFactory, storage Storage) *provider {
 		delete(data, "ct")
 		_p.ca.Add(_p.sf.Restore(sid, meta, data))
 	}
-	_p.storageSync()
+	// _p.storageSync()
 	return _p
 }
 
@@ -204,13 +215,21 @@ func (p *provider) sessionInit(sid string) (Session, error) {
 func (p *provider) SessionRead(sid string) (Session, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if sess := p.ca.Get(sid); sess != nil {
-		if !p.ac.ShouldReap(sess.Get("ct").(int64)) {
-			return sess, nil
-		}
-		p.ca.Remove(sid)
+	info := p.ca.Get(sid)
+	if info == nil {
+		return p.sessionInit(sid)
 	}
-	return p.sessionInit(sid)
+	if p.ac.ShouldReap(info.ct) {
+		p.ca.Remove(sid)
+		return p.sessionInit(sid)
+	}
+	if info.sess == nil {
+		meta := map[string]any{
+			"ct": info.ct,
+		}
+		return p.sf.Restore(info.id, meta, nil), nil
+	}
+	return info.sess, nil
 }
 
 // Destroys the session.
@@ -238,21 +257,21 @@ func (p *provider) SessionGC() {
 	}
 }
 
-var ProviderSyncRoutineTime time.Duration = 10 * time.Second
+// var ProviderSyncRoutineTime time.Duration = 10 * time.Second
 
-func (p *provider) storageSync() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	elem := p.ca.collec.Front()
-	for {
-		if elem == nil {
-			break
-		}
-		sess := elem.Value.(*cacheNode).sess
-		p.st.Save(sess.SessionID(), p.sf.ExtractValues(sess))
-		elem = elem.Next()
-	}
-	p.t = time.AfterFunc(ProviderSyncRoutineTime, func() {
-		p.storageSync()
-	})
-}
+// func (p *provider) storageSync() {
+// 	p.mu.Lock()
+// 	defer p.mu.Unlock()
+// 	elem := p.ca.collec.Front()
+// 	for {
+// 		if elem == nil {
+// 			break
+// 		}
+// 		sess := elem.Value.(*cacheNode).sess
+// 			p.st.Save(sess.SessionID(), p.sf.ExtractValues(sess))
+// 		elem = elem.Next()
+// 	}
+// 	p.t = time.AfterFunc(ProviderSyncRoutineTime, func() {
+// 		p.storageSync()
+// 	})
+// }

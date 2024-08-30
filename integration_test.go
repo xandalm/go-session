@@ -391,71 +391,71 @@ func TestSessionsWithFileSystemStorage(t *testing.T) {
 	performTest(t)
 }
 
-func BenchmarkOnFileSystemStorage(b *testing.B) {
-	path := "sessions_from_integration_test"
-	session.ProviderSyncRoutineTime = 1 * time.Second
-	session.Config("SESSION_ID", 3600, session.DefaultSessionFactory, filesystem.NewStorage(path, ""))
-	h := newServer()
+// func BenchmarkOnFileSystemStorage(b *testing.B) {
+// 	path := "sessions_from_integration_test"
+// 	session.ProviderSyncRoutineTime = 1 * time.Second
+// 	session.Config("SESSION_ID", 3600, session.DefaultSessionFactory, filesystem.NewStorage(path, ""))
+// 	h := newServer()
 
-	init := func(username string) *stubCookieManager {
-		cm := newStubCookieManager()
-		form := url.Values{}
-		form.Set("username", username)
+// 	init := func(username string) *stubCookieManager {
+// 		cm := newStubCookieManager()
+// 		form := url.Values{}
+// 		form.Set("username", username)
 
-		body := strings.NewReader(form.Encode())
-		res := doPost(h, "http://foo.com/login", body, map[string]string{"Content-Type": "application/x-www-form-urlencoded"}, nil)
-		assertHTTPStatus(b, res, http.StatusOK)
+// 		body := strings.NewReader(form.Encode())
+// 		res := doPost(h, "http://foo.com/login", body, map[string]string{"Content-Type": "application/x-www-form-urlencoded"}, nil)
+// 		assertHTTPStatus(b, res, http.StatusOK)
 
-		cookie := parseCookie(getCookieFromResponse(res))
-		cm.SetCookie(cookie)
+// 		cookie := parseCookie(getCookieFromResponse(res))
+// 		cm.SetCookie(cookie)
 
-		cookies := cm.Cookies()
-		res = doPost(h, "http://foo.com/start", nil, nil, cookies)
+// 		cookies := cm.Cookies()
+// 		res = doPost(h, "http://foo.com/start", nil, nil, cookies)
 
-		if res.Code != http.StatusOK {
-			fmt.Println(username)
-		}
+// 		if res.Code != http.StatusOK {
+// 			fmt.Println(username)
+// 		}
 
-		assertHTTPStatus(b, res, http.StatusOK)
-		return cm
-	}
+// 		assertHTTPStatus(b, res, http.StatusOK)
+// 		return cm
+// 	}
 
-	logout := func(cm *stubCookieManager) {
-		cookies := cm.Cookies()
-		res := doGet(h, "http://foo.com/logout", nil, nil, cookies)
-		assertHTTPStatus(b, res, http.StatusOK)
-	}
+// 	logout := func(cm *stubCookieManager) {
+// 		cookies := cm.Cookies()
+// 		res := doGet(h, "http://foo.com/logout", nil, nil, cookies)
+// 		assertHTTPStatus(b, res, http.StatusOK)
+// 	}
 
-	score := func(cm *stubCookieManager, ch chan int8) {
-		cookies := cm.Cookies()
-		res := doPost(h, "http://foo.com/score", nil, nil, cookies)
-		assertHTTPStatus(b, res, http.StatusOK)
-		ch <- 1
-	}
+// 	score := func(cm *stubCookieManager, ch chan int8) {
+// 		cookies := cm.Cookies()
+// 		res := doPost(h, "http://foo.com/score", nil, nil, cookies)
+// 		assertHTTPStatus(b, res, http.StatusOK)
+// 		ch <- 1
+// 	}
 
-	players := []*stubCookieManager{
-		init("john"),
-		init("anie"),
-		init("hugo"),
-		init("riya"),
-	}
+// 	players := []*stubCookieManager{
+// 		init("john"),
+// 		init("anie"),
+// 		init("hugo"),
+// 		init("riya"),
+// 	}
 
-	ch := make(chan int8, b.N*4)
+// 	ch := make(chan int8, b.N*4)
 
-	b.StartTimer()
-	for i := 0; i < b.N; i++ {
-		go score(players[0], ch)
-		go score(players[1], ch)
-		go score(players[2], ch)
-		go score(players[3], ch)
-	}
-	for i := 0; i < b.N*4; i++ {
-		<-ch
-	}
-	b.StopTimer()
+// 	b.StartTimer()
+// 	for i := 0; i < b.N; i++ {
+// 		go score(players[0], ch)
+// 		go score(players[1], ch)
+// 		go score(players[2], ch)
+// 		go score(players[3], ch)
+// 	}
+// 	for i := 0; i < b.N*4; i++ {
+// 		<-ch
+// 	}
+// 	b.StopTimer()
 
-	logout(players[0])
-	logout(players[1])
-	logout(players[2])
-	logout(players[3])
-}
+// 	logout(players[0])
+// 	logout(players[1])
+// 	logout(players[2])
+// 	logout(players[3])
+// }
