@@ -440,7 +440,7 @@ func BenchmarkOnFileSystemStorage(b *testing.B) {
 		init("riya"),
 	}
 
-	ch := make(chan int8, b.N)
+	ch := make(chan int8, b.N*4)
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
@@ -449,10 +449,7 @@ func BenchmarkOnFileSystemStorage(b *testing.B) {
 		go score(players[2], ch)
 		go score(players[3], ch)
 	}
-	for i := 0; i < b.N; i++ {
-		<-ch
-		<-ch
-		<-ch
+	for i := 0; i < b.N*4; i++ {
 		<-ch
 	}
 	b.StopTimer()
