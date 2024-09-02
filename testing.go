@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"time"
@@ -61,7 +62,7 @@ type stubProvider struct {
 	Sessions map[string]Session
 }
 
-func (p *stubProvider) SessionInit(sid string) (Session, error) {
+func (p *stubProvider) SessionInit(ctx context.Context, sid string) (Session, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.Sessions == nil {
@@ -74,7 +75,7 @@ func (p *stubProvider) SessionInit(sid string) (Session, error) {
 	return sess, nil
 }
 
-func (p *stubProvider) SessionRead(sid string) (Session, error) {
+func (p *stubProvider) SessionRead(ctx context.Context, sid string) (Session, error) {
 	sess := p.Sessions[sid]
 	return sess, nil
 }
@@ -90,11 +91,11 @@ func (p *stubProvider) SessionGC() {}
 
 type stubFailingProvider struct{}
 
-func (p *stubFailingProvider) SessionInit(sid string) (Session, error) {
+func (p *stubFailingProvider) SessionInit(ctx context.Context, sid string) (Session, error) {
 	return nil, errFoo
 }
 
-func (p *stubFailingProvider) SessionRead(sid string) (Session, error) {
+func (p *stubFailingProvider) SessionRead(ctx context.Context, sid string) (Session, error) {
 	return nil, errFoo
 }
 

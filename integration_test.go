@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -36,8 +38,7 @@ func (s *stubServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "/login":
 		s.handleLogIn(w, r, sess)
 	case "/logout":
-		session.Destroy(w, r)
-		w.WriteHeader(http.StatusOK)
+		s.handleLogOut(w, r, sess)
 	case "/players":
 		s.handleGetOnlinePlayers(w, r, sess)
 	case "/start":
@@ -67,6 +68,19 @@ func (s *stubServer) handleLogIn(w http.ResponseWriter, r *http.Request, sess se
 	}
 
 	s.players = append(s.players, username)
+}
+
+func (s *stubServer) handleLogOut(w http.ResponseWriter, r *http.Request, sess session.Session) {
+	if isLogged, ok := sess.Get("logged").(bool); !ok || !isLogged {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	pos, _ := slices.BinarySearch(s.players, sess.Get("username").(string))
+	s.players = slices.Delete(s.players, pos, pos+1)
+
+	session.Destroy(w, r)
+	w.WriteHeader(http.StatusOK)
 }
 
 func (s *stubServer) handleGetOnlinePlayers(w http.ResponseWriter, _ *http.Request, sess session.Session) {
@@ -389,6 +403,12 @@ func TestSessionsWithFileSystemStorage(t *testing.T) {
 	session.Config("SESSION_ID", 1, session.DefaultSessionFactory, filesystem.NewStorage(path, ""))
 
 	performTest(t)
+
+	t.Cleanup(func() {
+		if err := os.RemoveAll(path); err != nil {
+			t.Fatalf("cannot clean up after test, %v", err)
+		}
+	})
 }
 
 // func BenchmarkOnFileSystemStorage(b *testing.B) {

@@ -2,6 +2,7 @@ package session
 
 import (
 	"container/list"
+	"context"
 	"errors"
 	"slices"
 	"sync"
@@ -45,17 +46,12 @@ func (c *cache) find(sid string) *cacheNode {
 	return nil
 }
 
-func (c *cache) Add(sess Session) {
-	info := &sessionInfo{
-		sess,
-		sess.SessionID(),
-		sess.Get("ct").(int64),
-	}
+func (c *cache) Add(info *sessionInfo) {
 	n := &cacheNode{
 		info, 0, nil,
 	}
 	n.anchor = c.collec.PushBack(n)
-	n.idxPos, _ = c.findIndex(sess.SessionID())
+	n.idxPos, _ = c.findIndex(info.id)
 	c.idx = slices.Insert(c.idx, n.idxPos, n)
 	for i := n.idxPos + 1; i < len(c.idx); i++ {
 		c.idx[i].idxPos += 1
@@ -91,8 +87,7 @@ func (c *cache) ExpiredSessions(checker ageChecker) []string {
 			break
 		}
 		node := elem.Value.(*cacheNode)
-		ct := node.info.ct
-		if !checker.ShouldReap(ct) {
+		if !checker.ShouldReap(node.info.ct) {
 			break
 		}
 		c.remove(node)
@@ -118,7 +113,7 @@ type provider struct {
 	ca *cache         // Cached sessions
 	st Storage        // Session storage (persistence, normally)
 	sf SessionFactory // Session factory for session analysis
-	t  *time.Timer
+	// t  *time.Timer
 }
 
 var _p *provider = nil
@@ -164,7 +159,14 @@ func newProvider(ac ageChecker, sf SessionFactory, storage Storage) *provider {
 			"ct": data["ct"],
 		}
 		// delete(data, "ct")
-		_p.ca.Add(_p.sf.Restore(sid, meta, nil))
+
+		sess := _p.sf.Restore(sid, meta, nil)
+
+		_p.ca.Add(&sessionInfo{
+			sess,
+			sess.SessionID(),
+			sess.Get("ct").(int64),
+		})
 	}
 	// _p.storageSync()
 	return _p
@@ -188,13 +190,13 @@ var (
 // - Session cannot be created through the storage api.
 //
 // Otherwise, will return the session.
-func (p *provider) SessionInit(sid string) (Session, error) {
+func (p *provider) SessionInit(ctx context.Context, sid string) (Session, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return p.sessionInit(sid)
+	return p.sessionInit(ctx, sid)
 }
 
-func (p *provider) sessionInit(sid string) (Session, error) {
+func (p *provider) sessionInit(ctx context.Context, sid string) (Session, error) {
 	if sid == "" {
 		return nil, ErrEmptySessionId
 	}
@@ -203,7 +205,15 @@ func (p *provider) sessionInit(sid string) (Session, error) {
 	}
 	now := time.Now().UnixNano()
 	sess := p.sf.Create(sid, map[string]any{"ct": now})
-	p.ca.Add(sess)
+	info := &sessionInfo{
+		sess,
+		sid,
+		now,
+	}
+	p.ca.Add(info)
+
+	p.registerSessionPush(ctx, info)
+
 	return sess, nil
 }
 
@@ -212,29 +222,31 @@ func (p *provider) sessionInit(sid string) (Session, error) {
 //
 // Returns error when cannot get session through storage api, or cannot
 // create one. Otherwise, will return the session.
-func (p *provider) SessionRead(sid string) (Session, error) {
+func (p *provider) SessionRead(ctx context.Context, sid string) (Session, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	info := p.ca.Get(sid)
 	if info == nil {
-		return p.sessionInit(sid)
+		return p.sessionInit(ctx, sid)
 	}
 	if p.ac.ShouldReap(info.ct) {
 		p.ca.Remove(sid)
-		return p.sessionInit(sid)
+		p.st.Delete(sid)
+		return p.sessionInit(ctx, sid)
 	}
 	if info.sess == nil {
 		data, err := p.st.Read(sid)
 		if err != nil {
 			p.ca.Remove(sid)
-			return p.sessionInit(sid)
+			return p.sessionInit(ctx, sid)
 		}
 		meta := map[string]any{
 			"ct": info.ct,
 		}
 		delete(data, "ct")
-		return p.sf.Restore(info.id, meta, data), nil
+		info.sess = p.sf.Restore(info.id, meta, data)
 	}
+	p.registerSessionPush(ctx, info)
 	return info.sess, nil
 }
 
@@ -256,11 +268,33 @@ func (p *provider) SessionDestroy(sid string) error {
 func (p *provider) SessionGC() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	for _, sid := range p.ca.ExpiredSessions(p.ac) {
-		if p.st != nil {
-			p.st.Delete(sid)
-		}
+
+	expired := p.ca.ExpiredSessions(p.ac)
+	if p.st == nil {
+		return
 	}
+	for _, sid := range expired {
+		p.st.Delete(sid)
+	}
+}
+
+func (p *provider) registerSessionPush(ctx context.Context, info *sessionInfo) {
+	go push(ctx, p, info)
+}
+
+func push(ctx context.Context, p *provider, info *sessionInfo) {
+	<-ctx.Done()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if !p.ca.Contains(info.id) {
+		return
+	}
+	sess := info.sess
+	if sess == nil {
+		return
+	}
+	p.st.Save(sess.SessionID(), p.sf.ExtractValues(sess))
+	info.sess = nil
 }
 
 // var ProviderSyncRoutineTime time.Duration = 10 * time.Second

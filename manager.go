@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"io"
@@ -48,8 +49,8 @@ type Storage interface {
 }
 
 type Provider interface {
-	SessionInit(sid string) (Session, error)
-	SessionRead(sid string) (Session, error)
+	SessionInit(ctx context.Context, sid string) (Session, error)
+	SessionRead(ctx context.Context, sid string) (Session, error)
 	SessionDestroy(sid string) error
 	SessionGC()
 }
@@ -127,20 +128,16 @@ func (m *Manager) StartSession(w http.ResponseWriter, r *http.Request) (session 
 	cookie, err := r.Cookie(m.cookieName)
 	if err != nil || cookie.Value == "" {
 		sid := m.sessionID()
-		session, err = m.provider.SessionInit(sid)
+		session, err = m.provider.SessionInit(r.Context(), sid)
 		cookie := http.Cookie{Name: m.cookieName, Value: url.QueryEscape(sid), Path: "/", HttpOnly: true, MaxAge: int(m.maxAge)}
 		http.SetCookie(w, &cookie)
 	} else {
 		sid, _ := url.QueryUnescape(cookie.Value)
-		session, err = m.provider.SessionRead(sid)
+		session, err = m.provider.SessionRead(r.Context(), sid)
 	}
 	if err != nil || session == nil {
 		panic("session: unable to start the session")
 	}
-	// go func(ctx context.Context) {
-	// 	<-ctx.Done()
-	// 	m.provider.SessionSync(session)
-	// }(r.Context())
 	return
 }
 

@@ -2,6 +2,7 @@ package session
 
 import (
 	"container/list"
+	"context"
 	"maps"
 	"testing"
 	"time"
@@ -20,20 +21,20 @@ func TestCache_Add(t *testing.T) {
 			Id:        "1",
 			CreatedAt: NowTimeNanoseconds(),
 		}
-		c.Add(sess)
+		info := &sessionInfo{
+			sess,
+			sess.Id,
+			sess.CreatedAt,
+		}
+		c.Add(info)
 
 		if c.collec.Len() < 1 {
 			t.Fatal("didn't add session on cache collection")
 		}
 
 		got := c.collec.Front().Value.(*cacheNode).info
-		want := sessionInfo{
-			sess,
-			sess.SessionID(),
-			sess.CreatedAt,
-		}
 
-		assert.Equal(t, *got, want)
+		assert.Equal(t, got, info)
 
 		t.Run("add in sid sorted index", func(t *testing.T) {
 			if len(c.idx) < 1 {
@@ -46,7 +47,7 @@ func TestCache_Add(t *testing.T) {
 
 			got := node.info
 
-			assert.Equal(t, *got, want)
+			assert.Equal(t, got, info)
 		})
 
 	})
@@ -73,10 +74,17 @@ func TestCache_Add(t *testing.T) {
 			[]*cacheNode{node},
 		}
 
-		c.Add(&stubSession{
+		sess = &stubSession{
 			Id:        "1",
 			CreatedAt: NowTimeNanoseconds(),
-		})
+		}
+
+		info := &sessionInfo{
+			sess,
+			sess.Id,
+			sess.CreatedAt,
+		}
+		c.Add(info)
 
 		if c.collec.Len() != 2 {
 			t.Fatal("didn't add session")
@@ -230,9 +238,28 @@ func TestCache_ExpiredSessions(t *testing.T) {
 	})
 }
 
+type stubContext struct{}
+
+func (s *stubContext) Deadline() (deadline time.Time, ok bool) {
+	return time.Now(), false
+}
+
+func (s *stubContext) Done() <-chan struct{} {
+	return make(<-chan struct{})
+}
+
+func (s *stubContext) Err() error {
+	return nil
+}
+
+func (s *stubContext) Value(key any) any {
+	return nil
+}
+
 func TestProvider_SessionInit(t *testing.T) {
 
 	dummyStorage := newStubStorage()
+	dummyContext := &stubContext{}
 
 	sf := &mockSessionFactory{
 		CreateFunc: func(id string, m map[string]any) Session {
@@ -258,7 +285,7 @@ func TestProvider_SessionInit(t *testing.T) {
 	t.Run("init the session", func(t *testing.T) {
 
 		sid := "17af454"
-		sess, err := provider.SessionInit(sid)
+		sess, err := provider.SessionInit(dummyContext, sid)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, sess)
@@ -267,12 +294,12 @@ func TestProvider_SessionInit(t *testing.T) {
 	})
 	t.Run("returns error for empty sid", func(t *testing.T) {
 
-		_, err := provider.SessionInit("")
+		_, err := provider.SessionInit(dummyContext, "")
 
 		assert.Equal(t, err, ErrEmptySessionId)
 	})
 	t.Run("returns error for duplicated sid", func(t *testing.T) {
-		_, err := provider.SessionInit("17af454")
+		_, err := provider.SessionInit(dummyContext, "17af454")
 
 		assert.Equal(t, err, ErrDuplicatedSessionId)
 	})
@@ -281,6 +308,7 @@ func TestProvider_SessionInit(t *testing.T) {
 func TestProvider_SessionRead(t *testing.T) {
 
 	dummyStorage := newStubStorage()
+	dummyContext := &stubContext{}
 
 	cache := &cache{
 		list.New(),
@@ -318,12 +346,17 @@ func TestProvider_SessionRead(t *testing.T) {
 		Id:        "17af454",
 		CreatedAt: NowTimeNanoseconds(),
 	}
+	info := &sessionInfo{
+		sess,
+		sess.Id,
+		sess.CreatedAt,
+	}
 
-	cache.Add(sess)
+	cache.Add(info)
 
 	t.Run("returns session", func(t *testing.T) {
 		sid := "17af454"
-		got, err := provider.SessionRead(sid)
+		got, err := provider.SessionRead(dummyContext, sid)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, got)
@@ -333,7 +366,7 @@ func TestProvider_SessionRead(t *testing.T) {
 
 	t.Run("init session if has no session to read", func(t *testing.T) {
 		sid := "17af450"
-		got, err := provider.SessionRead(sid)
+		got, err := provider.SessionRead(dummyContext, sid)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, got)
@@ -364,8 +397,11 @@ func TestProvider_SessionDestroy(t *testing.T) {
 
 	sid := "17af454"
 
-	cache.Add(&stubSession{
-		Id: sid,
+	cache.Add(&sessionInfo{
+		sess: &stubSession{
+			Id: sid,
+		},
+		id: sid,
 	})
 
 	provider.ca = cache
@@ -409,17 +445,27 @@ func TestProvider_SessionGC(t *testing.T) {
 
 		now := time.Now().UnixNano()
 
-		cache.Add(&stubSession{
+		sess1 := &stubSession{
 			Id:        sid1,
 			V:         map[string]any{"ct": now - int64(3*time.Millisecond)},
 			CreatedAt: now - int64(3*time.Millisecond),
+		}
+		cache.Add(&sessionInfo{
+			sess1,
+			sess1.Id,
+			sess1.CreatedAt,
 		})
 		storage.data[sid1] = map[string]any{}
 
-		cache.Add(&stubSession{
+		sess2 := &stubSession{
 			Id:        sid2,
 			V:         map[string]any{"ct": now},
 			CreatedAt: now,
+		}
+		cache.Add(&sessionInfo{
+			sess2,
+			sess2.Id,
+			sess2.CreatedAt,
 		})
 		storage.data[sid2] = map[string]any{}
 
@@ -443,38 +489,55 @@ func TestProvider_SessionGC(t *testing.T) {
 	})
 }
 
-// func TestProvider_storageSync(t *testing.T) {
-// 	st := &stubStorage{
-// 		data: map[string]map[string]any{},
-// 	}
+func TestProvider_registerSessionPush(t *testing.T) {
 
-// 	sf := &mockSessionFactory{
-// 		ExtractValuesFunc: func(s Session) map[string]any {
-// 			return s.(*stubSession).V
-// 		},
-// 	}
+	provider := &provider{}
 
-// 	c := &cache{
-// 		list.New(),
-// 		[]*cacheNode{},
-// 	}
+	sid := "17af454"
 
-// 	c.Add(&stubSession{
-// 		Id: "1",
-// 		V:  map[string]any{"foo": "bar"},
-// 	})
+	storage := &stubStorage{
+		data: map[string]map[string]any{
+			sid: {},
+		},
+	}
 
-// 	p := &provider{
-// 		ca: c,
-// 		st: st,
-// 		sf: sf,
-// 	}
+	cache := &cache{
+		list.New(),
+		[]*cacheNode{},
+	}
 
-// 	p.storageSync()
+	factory := &mockSessionFactory{
+		ExtractValuesFunc: func(s Session) map[string]any {
+			return maps.Clone(s.(*stubSession).V)
+		},
+	}
 
-// 	// interrupt recurrent sync
-// 	p.interruptSyncRoutine()
+	sess := &stubSession{
+		Id:        sid,
+		V:         map[string]any{},
+		CreatedAt: NowTimeNanoseconds(),
+	}
 
-// 	assert.NotEmpty(t, st.data)
-// 	assert.Equal(t, st.data["1"], map[string]any{"foo": "bar"})
-// }
+	info := &sessionInfo{
+		sess,
+		sess.Id,
+		sess.CreatedAt,
+	}
+	cache.Add(info)
+
+	provider.ca = cache
+	provider.st = storage
+	provider.sf = factory
+
+	sess.V["foo"] = "bar"
+
+	ctx, cancel := context.WithCancel(context.Background())
+	provider.registerSessionPush(ctx, info)
+
+	cancel()
+
+	time.Sleep(1 * time.Microsecond)
+
+	assert.Equal(t, storage.data[sid], sess.V)
+	assert.Nil(t, info.sess)
+}
