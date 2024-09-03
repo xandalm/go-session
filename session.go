@@ -117,6 +117,8 @@ func (sf *sessionFactory) Restore(id string, m map[string]any, v map[string]any)
 // OverrideValues implements SessionFactory.
 func (sf *sessionFactory) OverrideValues(sess Session, v map[string]any) {
 	_sess := sess.(*session)
+	_sess.mu.Lock()
+	defer _sess.mu.Unlock()
 	for key, value := range v {
 		_sess.v[key] = value
 	}
@@ -124,7 +126,10 @@ func (sf *sessionFactory) OverrideValues(sess Session, v map[string]any) {
 
 // ExtractValues implements SessionFactory.
 func (sf *sessionFactory) ExtractValues(sess Session) map[string]any {
-	return maps.Clone(sess.(*session).v)
+	_sess := sess.(*session)
+	_sess.mu.Lock()
+	defer _sess.mu.Unlock()
+	return maps.Clone(_sess.v)
 }
 
 var DefaultSessionFactory SessionFactory = &sessionFactory{}
