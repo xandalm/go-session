@@ -14,7 +14,7 @@ var protectedKeyNames map[string]int8
 type session struct {
 	mu sync.Mutex
 	id string
-	v  map[string]any
+	v  Values
 	fn OnSessionMutation
 }
 
@@ -55,7 +55,7 @@ func (s *session) mapped(v reflect.Value) any {
 		panic("session: cannot stores chan into session")
 	case reflect.Struct:
 		vFields := reflect.VisibleFields(v.Type())
-		m := map[string]any{}
+		m := Values{}
 		for _, f := range vFields {
 			fValue := v.FieldByName(f.Name)
 			if fValue.Kind() == reflect.Struct || fValue.Kind() == reflect.Map {
@@ -66,7 +66,7 @@ func (s *session) mapped(v reflect.Value) any {
 		}
 		return m
 	case reflect.Map:
-		m := map[string]any{}
+		m := Values{}
 		for _, k := range v.MapKeys() {
 			m[k.String()] = s.mapped(v.MapIndex(k))
 		}
@@ -94,10 +94,10 @@ func (s *session) Delete(key string) error {
 type sessionFactory struct{}
 
 // Create implements SessionFactory.
-func (sf *sessionFactory) Create(id string, m map[string]any, fn OnSessionMutation) Session {
+func (sf *sessionFactory) Create(id string, m Values, fn OnSessionMutation) Session {
 	s := &session{
 		id: id,
-		v:  make(map[string]any),
+		v:  make(Values),
 	}
 	for k, v := range m {
 		protectedKeyNames[k] = 1
@@ -107,10 +107,10 @@ func (sf *sessionFactory) Create(id string, m map[string]any, fn OnSessionMutati
 }
 
 // Restore implements SessionFactory.
-func (sf *sessionFactory) Restore(id string, m map[string]any, v map[string]any, fn OnSessionMutation) Session {
+func (sf *sessionFactory) Restore(id string, m Values, v Values, fn OnSessionMutation) Session {
 	s := &session{
 		id: id,
-		v:  make(map[string]any),
+		v:  make(Values),
 	}
 	maps.Copy(s.v, v)
 	for key, value := range m {
@@ -122,7 +122,7 @@ func (sf *sessionFactory) Restore(id string, m map[string]any, v map[string]any,
 }
 
 // OverrideValues implements SessionFactory.
-func (sf *sessionFactory) OverrideValues(sess Session, v map[string]any) {
+func (sf *sessionFactory) OverrideValues(sess Session, v Values) {
 	_sess := sess.(*session)
 	_sess.mu.Lock()
 	defer _sess.mu.Unlock()
@@ -132,7 +132,7 @@ func (sf *sessionFactory) OverrideValues(sess Session, v map[string]any) {
 }
 
 // ExtractValues implements SessionFactory.
-func (sf *sessionFactory) ExportValues(sess Session) map[string]any {
+func (sf *sessionFactory) ExportValues(sess Session) Values {
 	_sess := sess.(*session)
 	_sess.mu.Lock()
 	defer _sess.mu.Unlock()

@@ -10,7 +10,7 @@ import (
 type stubSession struct {
 	Id        string
 	CreatedAt int64
-	V         map[string]any
+	V         Values
 }
 
 func (s *stubSession) Set(key string, value any) error {
@@ -35,25 +35,25 @@ func (s *stubSession) SessionID() string {
 }
 
 type mockSessionFactory struct {
-	CreateFunc         func(string, map[string]any, OnSessionMutation) Session
-	RestoreFunc        func(string, map[string]any, map[string]any, OnSessionMutation) Session
-	OverrideValuesFunc func(Session, map[string]any)
-	ExportValuesFunc   func(Session) map[string]any
+	CreateFunc         func(string, Values, OnSessionMutation) Session
+	RestoreFunc        func(string, Values, Values, OnSessionMutation) Session
+	OverrideValuesFunc func(Session, Values)
+	ExportValuesFunc   func(Session) Values
 }
 
-func (sf *mockSessionFactory) Create(id string, m map[string]any, fn OnSessionMutation) Session {
+func (sf *mockSessionFactory) Create(id string, m Values, fn OnSessionMutation) Session {
 	return sf.CreateFunc(id, m, fn)
 }
 
-func (sf *mockSessionFactory) Restore(id string, m map[string]any, v map[string]any, fn OnSessionMutation) Session {
+func (sf *mockSessionFactory) Restore(id string, m Values, v Values, fn OnSessionMutation) Session {
 	return sf.RestoreFunc(id, m, v, fn)
 }
 
-func (sf *mockSessionFactory) OverrideValues(sess Session, values map[string]any) {
+func (sf *mockSessionFactory) OverrideValues(sess Session, values Values) {
 	sf.OverrideValuesFunc(sess, values)
 }
 
-func (sf *mockSessionFactory) ExportValues(sess Session) map[string]any {
+func (sf *mockSessionFactory) ExportValues(sess Session) Values {
 	return sf.ExportValuesFunc(sess)
 }
 
@@ -107,26 +107,26 @@ func (p *stubFailingProvider) SessionGC() {}
 
 type stubStorage struct {
 	mu   sync.Mutex
-	data map[string]map[string]any
+	data map[string]Values
 }
 
 func newStubStorage() *stubStorage {
 	return &stubStorage{
-		data: make(map[string]map[string]any),
+		data: make(map[string]Values),
 	}
 }
 
-func (ss *stubStorage) Save(id string, values map[string]any) error {
+func (ss *stubStorage) Save(id string, values Values) error {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 	if ss.data == nil {
-		ss.data = map[string]map[string]any{}
+		ss.data = map[string]Values{}
 	}
 	ss.data[id] = values
 	return nil
 }
 
-func (ss *stubStorage) Read(id string) (map[string]any, error) {
+func (ss *stubStorage) Read(id string) (Values, error) {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
 	if v, ok := ss.data[id]; ok {

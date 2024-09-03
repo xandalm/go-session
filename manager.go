@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+type Values map[string]any
+
 type Session interface {
 	SessionID() string
 	Set(string, any) error
@@ -23,22 +25,22 @@ type SessionFactory interface {
 	// Creates a Session with the given id and the meta values.
 	// It's suggested that the meta values can't be manipulated
 	// through [Session.Set] or [Session.Get]
-	Create(id string, m map[string]any, fn OnSessionMutation) Session
+	Create(id string, m Values, fn OnSessionMutation) Session
 	// Similar to Create method, but this method assume that the
 	// session is being restored, allowing to put defined values.
-	Restore(id string, m map[string]any, v map[string]any, fn OnSessionMutation) Session
+	Restore(id string, m Values, v Values, fn OnSessionMutation) Session
 	// Merge session values, overwriting old values and
 	// adding coming new values. The not collided values must
 	// be kept. Both common and meta values can be changed by
 	// this method.
-	OverrideValues(sess Session, v map[string]any)
+	OverrideValues(sess Session, v Values)
 	// Return all values, including common and meta values.
-	ExportValues(sess Session) map[string]any
+	ExportValues(sess Session) Values
 }
 
 type Storage interface {
-	Save(string, map[string]any) error
-	Read(string) (map[string]any, error)
+	Save(string, Values) error
+	Read(string) (Values, error)
 	List() ([]string, error)
 	Delete(string) error
 }

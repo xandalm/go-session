@@ -180,7 +180,7 @@ func TestCache_ExpiredSessions(t *testing.T) {
 
 	sess1 := &stubSession{
 		Id:        "1",
-		V:         map[string]any{},
+		V:         Values{},
 		CreatedAt: NowTimeNanoseconds(),
 	}
 	node1 := &cacheNode{
@@ -195,7 +195,7 @@ func TestCache_ExpiredSessions(t *testing.T) {
 
 	sess2 := &stubSession{
 		Id:        "2",
-		V:         map[string]any{},
+		V:         Values{},
 		CreatedAt: NowTimeNanoseconds(),
 	}
 	node2 := &cacheNode{
@@ -262,10 +262,10 @@ func TestProvider_SessionInit(t *testing.T) {
 	dummyContext := &stubContext{}
 
 	sf := &mockSessionFactory{
-		CreateFunc: func(id string, m map[string]any, fn OnSessionMutation) Session {
+		CreateFunc: func(id string, m Values, fn OnSessionMutation) Session {
 			s := &stubSession{
 				Id: id,
-				V:  make(map[string]any),
+				V:  make(Values),
 			}
 			maps.Copy(s.V, m)
 			return s
@@ -316,18 +316,18 @@ func TestProvider_SessionRead(t *testing.T) {
 	}
 
 	sf := &mockSessionFactory{
-		CreateFunc: func(id string, m map[string]any, fn OnSessionMutation) Session {
+		CreateFunc: func(id string, m Values, fn OnSessionMutation) Session {
 			s := &stubSession{
 				Id: id,
-				V:  make(map[string]any),
+				V:  make(Values),
 			}
 			maps.Copy(s.V, m)
 			return s
 		},
-		RestoreFunc: func(id string, m map[string]any, v map[string]any, fn OnSessionMutation) Session {
+		RestoreFunc: func(id string, m Values, v Values, fn OnSessionMutation) Session {
 			s := &stubSession{
 				Id: id,
-				V:  make(map[string]any),
+				V:  make(Values),
 			}
 			maps.Copy(s.V, m)
 			maps.Copy(s.V, v)
@@ -385,7 +385,7 @@ func TestProvider_SessionDestroy(t *testing.T) {
 	provider := &provider{}
 
 	storage := &stubStorage{
-		data: map[string]map[string]any{
+		data: map[string]Values{
 			"17af454": {},
 		},
 	}
@@ -426,7 +426,7 @@ func TestProvider_SessionGC(t *testing.T) {
 
 	t.Run("destroy sessions that arrives max age", func(t *testing.T) {
 		storage := &stubStorage{
-			data: map[string]map[string]any{},
+			data: map[string]Values{},
 		}
 
 		cache := &cache{
@@ -447,7 +447,7 @@ func TestProvider_SessionGC(t *testing.T) {
 
 		sess1 := &stubSession{
 			Id:        sid1,
-			V:         map[string]any{"ct": now - int64(3*time.Millisecond)},
+			V:         Values{"ct": now - int64(3*time.Millisecond)},
 			CreatedAt: now - int64(3*time.Millisecond),
 		}
 		cache.Add(&sessionInfo{
@@ -455,11 +455,11 @@ func TestProvider_SessionGC(t *testing.T) {
 			id:   sess1.Id,
 			ct:   sess1.CreatedAt,
 		})
-		storage.data[sid1] = map[string]any{}
+		storage.data[sid1] = Values{}
 
 		sess2 := &stubSession{
 			Id:        sid2,
-			V:         map[string]any{"ct": now},
+			V:         Values{"ct": now},
 			CreatedAt: now,
 		}
 		cache.Add(&sessionInfo{
@@ -467,7 +467,7 @@ func TestProvider_SessionGC(t *testing.T) {
 			id:   sess2.Id,
 			ct:   sess2.CreatedAt,
 		})
-		storage.data[sid2] = map[string]any{}
+		storage.data[sid2] = Values{}
 
 		provider.SessionGC()
 
@@ -496,7 +496,7 @@ func TestProvider_registerSessionPush(t *testing.T) {
 	sid := "17af454"
 
 	storage := &stubStorage{
-		data: map[string]map[string]any{
+		data: map[string]Values{
 			sid: {},
 		},
 	}
@@ -507,14 +507,14 @@ func TestProvider_registerSessionPush(t *testing.T) {
 	}
 
 	factory := &mockSessionFactory{
-		ExportValuesFunc: func(s Session) map[string]any {
+		ExportValuesFunc: func(s Session) Values {
 			return maps.Clone(s.(*stubSession).V)
 		},
 	}
 
 	sess := &stubSession{
 		Id:        sid,
-		V:         map[string]any{},
+		V:         Values{},
 		CreatedAt: NowTimeNanoseconds(),
 	}
 

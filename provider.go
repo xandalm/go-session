@@ -139,7 +139,7 @@ func newProvider(ac ageChecker, sf SessionFactory, storage Storage) *provider {
 			storage.Delete(sid)
 			continue
 		}
-		meta := map[string]any{
+		meta := Values{
 			"ct": data["ct"],
 		}
 
@@ -187,7 +187,7 @@ func (p *provider) sessionInit(ctx context.Context, sid string) (Session, error)
 		return nil, ErrDuplicatedSessionId
 	}
 	now := time.Now().UnixNano()
-	sess := p.sf.Create(sid, map[string]any{"ct": now}, p.onSessionMutation)
+	sess := p.sf.Create(sid, Values{"ct": now}, p.onSessionMutation)
 	info := &sessionInfo{
 		sess:    sess,
 		id:      sid,
@@ -224,7 +224,7 @@ func (p *provider) SessionRead(ctx context.Context, sid string) (Session, error)
 			p.ca.Remove(sid)
 			return p.sessionInit(ctx, sid)
 		}
-		meta := map[string]any{
+		meta := Values{
 			"ct": info.ct,
 		}
 		delete(data, "ct")

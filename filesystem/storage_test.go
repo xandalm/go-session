@@ -18,7 +18,7 @@ func TestStorage_Save(t *testing.T) {
 	t.Run("create", func(t *testing.T) {
 		id := "abcde"
 
-		err := storage.Save(id, map[string]any{"foo": "bar"})
+		err := storage.Save(id, Values{"foo": "bar"})
 
 		assert.NoError(t, err)
 
@@ -42,7 +42,7 @@ func TestStorage_Load(t *testing.T) {
 	prefix := "gosess_"
 
 	id := "abcde"
-	values := map[string]any{
+	values := Values{
 		"foo": "bar",
 		"int": 1,
 	}
@@ -72,8 +72,8 @@ func TestStorage_List(t *testing.T) {
 	id2 := "fghij"
 
 	storage := NewStorage(path, prefix)
-	storage.Save(id1, map[string]any{})
-	storage.Save(id2, map[string]any{})
+	storage.Save(id1, Values{})
+	storage.Save(id2, Values{})
 
 	got, err := storage.List()
 
@@ -102,7 +102,7 @@ func TestStorage_Delete(t *testing.T) {
 	prefix := "gosess_"
 
 	id := "abcde"
-	values := map[string]any{
+	values := Values{
 		"foo": "bar",
 		"int": 1,
 	}

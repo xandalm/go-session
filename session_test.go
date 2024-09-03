@@ -12,7 +12,7 @@ func TestSession_SessionID(t *testing.T) {
 	sess := &session{
 		sync.Mutex{},
 		"abcde",
-		map[string]any{},
+		Values{},
 		nil,
 	}
 
@@ -29,7 +29,7 @@ func TestSession_Get(t *testing.T) {
 		sess := &session{
 			sync.Mutex{},
 			"abcde",
-			map[string]any{"foo": "bar"},
+			Values{"foo": "bar"},
 			nil,
 		}
 
@@ -47,7 +47,7 @@ func TestSession_Set(t *testing.T) {
 	sess := &session{
 		sync.Mutex{},
 		"abcde",
-		map[string]any{},
+		Values{},
 		nil,
 	}
 	key := "foo"
@@ -68,7 +68,7 @@ func TestSession_Delete(t *testing.T) {
 	sess := &session{
 		sync.Mutex{},
 		"abcde",
-		map[string]any{"foo": "bar"},
+		Values{"foo": "bar"},
 		nil,
 	}
 
@@ -87,7 +87,7 @@ func TestSessionFactory(t *testing.T) {
 
 	t.Run("creates session", func(t *testing.T) {
 		id := "1"
-		m := map[string]any{"foo": "bar"}
+		m := Values{"foo": "bar"}
 
 		got := sf.Create(id, m, nil)
 
@@ -98,7 +98,7 @@ func TestSessionFactory(t *testing.T) {
 		assert.Equal(t, sess.v, m)
 
 		t.Run("defined meta values can't be mutable by session Set and Delete methods, causing error", func(t *testing.T) {
-			sess := sf.Create("1", map[string]any{"foo": "bar"}, nil)
+			sess := sf.Create("1", Values{"foo": "bar"}, nil)
 
 			err := sess.Set("foo", "baz")
 			assert.Error(t, err, ErrProtectedKeyName)
@@ -107,8 +107,8 @@ func TestSessionFactory(t *testing.T) {
 
 	t.Run("restores session", func(t *testing.T) {
 		id := "1"
-		m := map[string]any{"foo": "bar"}
-		v := map[string]any{"baz": "jaz"}
+		m := Values{"foo": "bar"}
+		v := Values{"baz": "jaz"}
 
 		got := sf.Restore(id, m, v, nil)
 
@@ -117,22 +117,22 @@ func TestSessionFactory(t *testing.T) {
 		sess := got.(*session)
 		assert.Equal(t, sess.id, id)
 
-		values := map[string]any{}
+		values := Values{}
 		maps.Copy(values, m)
 		maps.Copy(values, v)
 
 		assert.Equal(t, sess.v, values)
 
 		t.Run("defined meta values can't be mutable by session Set and Delete methods, causing error", func(t *testing.T) {
-			sess := sf.Restore("1", map[string]any{"foo": "bar"}, map[string]any{"baz": "jaz"}, nil)
+			sess := sf.Restore("1", Values{"foo": "bar"}, Values{"baz": "jaz"}, nil)
 
 			err := sess.Set("foo", "baz")
 			assert.Error(t, err, ErrProtectedKeyName)
 		})
 
 		t.Run("meta values will not be mutable by common values", func(t *testing.T) {
-			meta := map[string]any{"foo": "bar"}
-			common := map[string]any{"foo": "rab", "baz": "jaz"}
+			meta := Values{"foo": "bar"}
+			common := Values{"foo": "rab", "baz": "jaz"}
 
 			got := sf.Restore("1", meta, common, nil)
 
@@ -140,7 +140,7 @@ func TestSessionFactory(t *testing.T) {
 
 			sess := got.(*session)
 			assert.Equal(t, sess.id, id)
-			assert.Equal(t, sess.v, map[string]any{
+			assert.Equal(t, sess.v, Values{
 				"foo": "bar",
 				"baz": "jaz",
 			})
@@ -150,7 +150,7 @@ func TestSessionFactory(t *testing.T) {
 	t.Run("override session values", func(t *testing.T) {
 		sess := &session{
 			id: "1",
-			v: map[string]any{
+			v: Values{
 				"update": "before",
 				"keep":   "same",
 			},
@@ -158,13 +158,13 @@ func TestSessionFactory(t *testing.T) {
 
 		sf.OverrideValues(
 			sess,
-			map[string]any{
+			Values{
 				"update": "after",
 				"new":    "add",
 			},
 		)
 
-		want := map[string]any{
+		want := Values{
 			"update": "after",
 			"new":    "add",
 			"keep":   "same",
@@ -176,7 +176,7 @@ func TestSessionFactory(t *testing.T) {
 	t.Run("return session values", func(t *testing.T) {
 		sess := &session{
 			id: "1",
-			v: map[string]any{
+			v: Values{
 				"update": "before",
 				"keep":   "same",
 			},

@@ -7,7 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/xandalm/go-session"
 )
+
+type Values = session.Values
 
 type storage struct {
 	mu     sync.Mutex
@@ -28,7 +32,7 @@ func NewStorage(path, prefix string) *storage {
 	return s
 }
 
-func (s *storage) Save(id string, values map[string]any) error {
+func (s *storage) Save(id string, values Values) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	file, err := os.OpenFile(filepath.Join(s.path, s.prefix+id), os.O_RDWR|os.O_CREATE, 0666)
@@ -59,10 +63,10 @@ func (s *storage) List() ([]string, error) {
 	return ret, nil
 }
 
-func (s *storage) Read(id string) (map[string]any, error) {
+func (s *storage) Read(id string) (Values, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	data := make(map[string]any)
+	data := make(Values)
 	file, err := os.Open(filepath.Join(s.path, s.prefix+id))
 	if err != nil {
 		return data, err
@@ -87,5 +91,5 @@ func (s *storage) Delete(id string) error {
 }
 
 func init() {
-	gob.Register(map[string]any{})
+	gob.Register(Values{})
 }

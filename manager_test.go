@@ -142,25 +142,25 @@ func TestConfig(t *testing.T) {
 	maxAge := int64(60)
 	storage := newStubStorage()
 	sessionFactory := &mockSessionFactory{
-		CreateFunc: func(id string, m map[string]any, fn OnSessionMutation) Session {
+		CreateFunc: func(id string, m Values, fn OnSessionMutation) Session {
 			return &stubSession{
 				Id: id,
-				V:  make(map[string]any),
+				V:  make(Values),
 			}
 		},
-		RestoreFunc: func(id string, m map[string]any, v map[string]any, fn OnSessionMutation) Session {
+		RestoreFunc: func(id string, m Values, v Values, fn OnSessionMutation) Session {
 			return &stubSession{
 				Id: id,
 				V:  maps.Clone(m),
 			}
 		},
-		OverrideValuesFunc: func(s Session, m map[string]any) {
+		OverrideValuesFunc: func(s Session, m Values) {
 			sess := s.(*stubSession)
 			for k, v := range m {
 				sess.V[k] = v
 			}
 		},
-		ExportValuesFunc: func(s Session) map[string]any {
+		ExportValuesFunc: func(s Session) Values {
 			sess := s.(*stubSession)
 			return maps.Clone(sess.V)
 		},
