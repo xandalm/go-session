@@ -17,14 +17,16 @@ type Session interface {
 	Delete(string) error
 }
 
+type OnSessionMutation func(Session)
+
 type SessionFactory interface {
 	// Creates a Session with the given id and the meta values.
 	// It's suggested that the meta values can't be manipulated
 	// through [Session.Set] or [Session.Get]
-	Create(id string, m map[string]any) Session
+	Create(id string, m map[string]any, fn OnSessionMutation) Session
 	// Similar to Create method, but this method assume that the
 	// session is being restored, allowing to put defined values.
-	Restore(id string, m map[string]any, v map[string]any) Session
+	Restore(id string, m map[string]any, v map[string]any, fn OnSessionMutation) Session
 	// Merge session values, overwriting old values and
 	// adding coming new values. The not collided values must
 	// be kept. Both common and meta values can be changed by

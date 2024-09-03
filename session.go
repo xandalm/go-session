@@ -15,6 +15,7 @@ type session struct {
 	mu sync.Mutex
 	id string
 	v  map[string]any
+	fn OnSessionMutation
 }
 
 func (s *session) SessionID() string {
@@ -39,6 +40,9 @@ func (s *session) Set(key string, value any) error {
 
 	s.mu.Lock()
 	s.v[key] = s.mapped(rValue)
+	if s.fn != nil {
+		s.fn(s)
+	}
 	s.mu.Unlock()
 	return nil
 }
@@ -81,13 +85,16 @@ func (s *session) Delete(key string) error {
 	}
 
 	delete(s.v, key)
+	if s.fn != nil {
+		s.fn(s)
+	}
 	return nil
 }
 
 type sessionFactory struct{}
 
 // Create implements SessionFactory.
-func (sf *sessionFactory) Create(id string, m map[string]any) Session {
+func (sf *sessionFactory) Create(id string, m map[string]any, fn OnSessionMutation) Session {
 	s := &session{
 		id: id,
 		v:  make(map[string]any),
@@ -100,7 +107,7 @@ func (sf *sessionFactory) Create(id string, m map[string]any) Session {
 }
 
 // Restore implements SessionFactory.
-func (sf *sessionFactory) Restore(id string, m map[string]any, v map[string]any) Session {
+func (sf *sessionFactory) Restore(id string, m map[string]any, v map[string]any, fn OnSessionMutation) Session {
 	s := &session{
 		id: id,
 		v:  make(map[string]any),

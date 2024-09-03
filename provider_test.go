@@ -22,9 +22,9 @@ func TestCache_Add(t *testing.T) {
 			CreatedAt: NowTimeNanoseconds(),
 		}
 		info := &sessionInfo{
-			sess,
-			sess.Id,
-			sess.CreatedAt,
+			sess: sess,
+			id:   sess.Id,
+			ct:   sess.CreatedAt,
 		}
 		c.Add(info)
 
@@ -80,9 +80,9 @@ func TestCache_Add(t *testing.T) {
 		}
 
 		info := &sessionInfo{
-			sess,
-			sess.Id,
-			sess.CreatedAt,
+			sess: sess,
+			id:   sess.Id,
+			ct:   sess.CreatedAt,
 		}
 		c.Add(info)
 
@@ -185,9 +185,9 @@ func TestCache_ExpiredSessions(t *testing.T) {
 	}
 	node1 := &cacheNode{
 		info: &sessionInfo{
-			sess1,
-			sess1.Id,
-			sess1.CreatedAt,
+			sess: sess1,
+			id:   sess1.Id,
+			ct:   sess1.CreatedAt,
 		},
 	}
 
@@ -200,9 +200,9 @@ func TestCache_ExpiredSessions(t *testing.T) {
 	}
 	node2 := &cacheNode{
 		info: &sessionInfo{
-			sess2,
-			sess2.Id,
-			sess2.CreatedAt,
+			sess: sess2,
+			id:   sess2.Id,
+			ct:   sess2.CreatedAt,
 		},
 	}
 
@@ -262,7 +262,7 @@ func TestProvider_SessionInit(t *testing.T) {
 	dummyContext := &stubContext{}
 
 	sf := &mockSessionFactory{
-		CreateFunc: func(id string, m map[string]any) Session {
+		CreateFunc: func(id string, m map[string]any, fn OnSessionMutation) Session {
 			s := &stubSession{
 				Id: id,
 				V:  make(map[string]any),
@@ -316,7 +316,7 @@ func TestProvider_SessionRead(t *testing.T) {
 	}
 
 	sf := &mockSessionFactory{
-		CreateFunc: func(id string, m map[string]any) Session {
+		CreateFunc: func(id string, m map[string]any, fn OnSessionMutation) Session {
 			s := &stubSession{
 				Id: id,
 				V:  make(map[string]any),
@@ -324,7 +324,7 @@ func TestProvider_SessionRead(t *testing.T) {
 			maps.Copy(s.V, m)
 			return s
 		},
-		RestoreFunc: func(id string, m map[string]any, v map[string]any) Session {
+		RestoreFunc: func(id string, m map[string]any, v map[string]any, fn OnSessionMutation) Session {
 			s := &stubSession{
 				Id: id,
 				V:  make(map[string]any),
@@ -347,9 +347,9 @@ func TestProvider_SessionRead(t *testing.T) {
 		CreatedAt: NowTimeNanoseconds(),
 	}
 	info := &sessionInfo{
-		sess,
-		sess.Id,
-		sess.CreatedAt,
+		sess: sess,
+		id:   sess.Id,
+		ct:   sess.CreatedAt,
 	}
 
 	cache.Add(info)
@@ -451,9 +451,9 @@ func TestProvider_SessionGC(t *testing.T) {
 			CreatedAt: now - int64(3*time.Millisecond),
 		}
 		cache.Add(&sessionInfo{
-			sess1,
-			sess1.Id,
-			sess1.CreatedAt,
+			sess: sess1,
+			id:   sess1.Id,
+			ct:   sess1.CreatedAt,
 		})
 		storage.data[sid1] = map[string]any{}
 
@@ -463,9 +463,9 @@ func TestProvider_SessionGC(t *testing.T) {
 			CreatedAt: now,
 		}
 		cache.Add(&sessionInfo{
-			sess2,
-			sess2.Id,
-			sess2.CreatedAt,
+			sess: sess2,
+			id:   sess2.Id,
+			ct:   sess2.CreatedAt,
 		})
 		storage.data[sid2] = map[string]any{}
 
@@ -519,9 +519,9 @@ func TestProvider_registerSessionPush(t *testing.T) {
 	}
 
 	info := &sessionInfo{
-		sess,
-		sess.Id,
-		sess.CreatedAt,
+		sess: sess,
+		id:   sess.Id,
+		ct:   sess.CreatedAt,
 	}
 	cache.Add(info)
 

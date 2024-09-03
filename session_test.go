@@ -13,6 +13,7 @@ func TestSession_SessionID(t *testing.T) {
 		sync.Mutex{},
 		"abcde",
 		map[string]any{},
+		nil,
 	}
 
 	got := sess.SessionID()
@@ -29,6 +30,7 @@ func TestSession_Get(t *testing.T) {
 			sync.Mutex{},
 			"abcde",
 			map[string]any{"foo": "bar"},
+			nil,
 		}
 
 		got := sess.Get("foo")
@@ -46,6 +48,7 @@ func TestSession_Set(t *testing.T) {
 		sync.Mutex{},
 		"abcde",
 		map[string]any{},
+		nil,
 	}
 	key := "foo"
 	value := "bar"
@@ -66,6 +69,7 @@ func TestSession_Delete(t *testing.T) {
 		sync.Mutex{},
 		"abcde",
 		map[string]any{"foo": "bar"},
+		nil,
 	}
 
 	sess.Delete("foo")
@@ -85,7 +89,7 @@ func TestSessionFactory(t *testing.T) {
 		id := "1"
 		m := map[string]any{"foo": "bar"}
 
-		got := sf.Create(id, m)
+		got := sf.Create(id, m, nil)
 
 		assert.NotNil(t, got)
 
@@ -94,7 +98,7 @@ func TestSessionFactory(t *testing.T) {
 		assert.Equal(t, sess.v, m)
 
 		t.Run("defined meta values can't be mutable by session Set and Delete methods, causing error", func(t *testing.T) {
-			sess := sf.Create("1", map[string]any{"foo": "bar"})
+			sess := sf.Create("1", map[string]any{"foo": "bar"}, nil)
 
 			err := sess.Set("foo", "baz")
 			assert.Error(t, err, ErrProtectedKeyName)
@@ -106,7 +110,7 @@ func TestSessionFactory(t *testing.T) {
 		m := map[string]any{"foo": "bar"}
 		v := map[string]any{"baz": "jaz"}
 
-		got := sf.Restore(id, m, v)
+		got := sf.Restore(id, m, v, nil)
 
 		assert.NotNil(t, got)
 
@@ -120,7 +124,7 @@ func TestSessionFactory(t *testing.T) {
 		assert.Equal(t, sess.v, values)
 
 		t.Run("defined meta values can't be mutable by session Set and Delete methods, causing error", func(t *testing.T) {
-			sess := sf.Restore("1", map[string]any{"foo": "bar"}, map[string]any{"baz": "jaz"})
+			sess := sf.Restore("1", map[string]any{"foo": "bar"}, map[string]any{"baz": "jaz"}, nil)
 
 			err := sess.Set("foo", "baz")
 			assert.Error(t, err, ErrProtectedKeyName)
@@ -130,7 +134,7 @@ func TestSessionFactory(t *testing.T) {
 			meta := map[string]any{"foo": "bar"}
 			common := map[string]any{"foo": "rab", "baz": "jaz"}
 
-			got := sf.Restore("1", meta, common)
+			got := sf.Restore("1", meta, common, nil)
 
 			assert.NotNil(t, got)
 

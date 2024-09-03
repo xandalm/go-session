@@ -10,9 +10,11 @@ import (
 )
 
 type sessionInfo struct {
-	sess Session
-	id   string
-	ct   int64
+	sess     Session
+	id       string
+	ct       int64
+	trusted  bool
+	watchers int
 }
 
 type cacheNode struct {
@@ -104,8 +106,6 @@ func (c *cache) Get(sid string) *sessionInfo {
 	return nil
 }
 
-var ReservedFields = []string{"ct", "at"}
-
 // Provider that communicates with storage api to init, read and destroy sessions.
 type provider struct {
 	mu sync.Mutex     // Mutex
@@ -143,12 +143,13 @@ func newProvider(ac ageChecker, sf SessionFactory, storage Storage) *provider {
 			"ct": data["ct"],
 		}
 
-		sess := p.sf.Restore(sid, meta, nil)
+		sess := p.sf.Restore(sid, meta, nil, p.onSessionMutation)
 
 		p.ca.Add(&sessionInfo{
-			sess,
-			sess.SessionID(),
-			sess.Get("ct").(int64),
+			sess:    sess,
+			id:      sess.SessionID(),
+			ct:      sess.Get("ct").(int64),
+			trusted: true,
 		})
 	}
 	return p
@@ -186,11 +187,12 @@ func (p *provider) sessionInit(ctx context.Context, sid string) (Session, error)
 		return nil, ErrDuplicatedSessionId
 	}
 	now := time.Now().UnixNano()
-	sess := p.sf.Create(sid, map[string]any{"ct": now})
+	sess := p.sf.Create(sid, map[string]any{"ct": now}, p.onSessionMutation)
 	info := &sessionInfo{
-		sess,
-		sid,
-		now,
+		sess:    sess,
+		id:      sid,
+		ct:      now,
+		trusted: true,
 	}
 	p.ca.Add(info)
 
@@ -226,7 +228,7 @@ func (p *provider) SessionRead(ctx context.Context, sid string) (Session, error)
 			"ct": info.ct,
 		}
 		delete(data, "ct")
-		info.sess = p.sf.Restore(info.id, meta, data)
+		info.sess = p.sf.Restore(info.id, meta, data, p.onSessionMutation)
 	}
 	p.registerSessionPush(ctx, info)
 	return info.sess, nil
@@ -260,7 +262,19 @@ func (p *provider) SessionGC() {
 	}
 }
 
+func (p *provider) onSessionMutation(sess Session) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	info := p.ca.Get(sess.SessionID())
+	if info == nil {
+		return
+	}
+	info.trusted = false
+}
+
 func (p *provider) registerSessionPush(ctx context.Context, info *sessionInfo) {
+	info.watchers++
 	go push(ctx, p, info)
 }
 
@@ -268,13 +282,16 @@ func push(ctx context.Context, p *provider, info *sessionInfo) {
 	<-ctx.Done()
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if !p.ca.Contains(info.id) {
+	info.watchers--
+	if info.trusted || !p.ca.Contains(info.id) || info.sess == nil {
 		return
 	}
 	sess := info.sess
-	if sess == nil {
-		return
+	err := p.st.Save(sess.SessionID(), p.sf.ExportValues(sess))
+	if err == nil {
+		info.trusted = true
 	}
-	p.st.Save(sess.SessionID(), p.sf.ExportValues(sess))
-	info.sess = nil
+	if info.watchers == 0 {
+		info.sess = nil
+	}
 }
