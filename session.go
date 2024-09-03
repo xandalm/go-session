@@ -125,7 +125,7 @@ func (sf *sessionFactory) OverrideValues(sess Session, v map[string]any) {
 }
 
 // ExtractValues implements SessionFactory.
-func (sf *sessionFactory) ExtractValues(sess Session) map[string]any {
+func (sf *sessionFactory) ExportValues(sess Session) map[string]any {
 	_sess := sess.(*session)
 	_sess.mu.Lock()
 	defer _sess.mu.Unlock()

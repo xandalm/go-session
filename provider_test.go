@@ -507,7 +507,7 @@ func TestProvider_registerSessionPush(t *testing.T) {
 	}
 
 	factory := &mockSessionFactory{
-		ExtractValuesFunc: func(s Session) map[string]any {
+		ExportValuesFunc: func(s Session) map[string]any {
 			return maps.Clone(s.(*stubSession).V)
 		},
 	}

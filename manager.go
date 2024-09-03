@@ -31,7 +31,7 @@ type SessionFactory interface {
 	// this method.
 	OverrideValues(sess Session, v map[string]any)
 	// Return all values, including common and meta values.
-	ExtractValues(sess Session) map[string]any
+	ExportValues(sess Session) map[string]any
 }
 
 type Storage interface {

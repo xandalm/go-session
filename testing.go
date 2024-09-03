@@ -38,7 +38,7 @@ type mockSessionFactory struct {
 	CreateFunc         func(string, map[string]any) Session
 	RestoreFunc        func(string, map[string]any, map[string]any) Session
 	OverrideValuesFunc func(Session, map[string]any)
-	ExtractValuesFunc  func(Session) map[string]any
+	ExportValuesFunc   func(Session) map[string]any
 }
 
 func (sf *mockSessionFactory) Create(id string, m map[string]any) Session {
@@ -53,8 +53,8 @@ func (sf *mockSessionFactory) OverrideValues(sess Session, values map[string]any
 	sf.OverrideValuesFunc(sess, values)
 }
 
-func (sf *mockSessionFactory) ExtractValues(sess Session) map[string]any {
-	return sf.ExtractValuesFunc(sess)
+func (sf *mockSessionFactory) ExportValues(sess Session) map[string]any {
+	return sf.ExportValuesFunc(sess)
 }
 
 type stubProvider struct {

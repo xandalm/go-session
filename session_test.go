@@ -178,7 +178,7 @@ func TestSessionFactory(t *testing.T) {
 			},
 		}
 
-		got := sf.ExtractValues(sess)
+		got := sf.ExportValues(sess)
 		assert.Equal(t, got, sess.v)
 	})
 }

@@ -160,7 +160,7 @@ func TestConfig(t *testing.T) {
 				sess.V[k] = v
 			}
 		},
-		ExtractValuesFunc: func(s Session) map[string]any {
+		ExportValuesFunc: func(s Session) map[string]any {
 			sess := s.(*stubSession)
 			return maps.Clone(sess.V)
 		},

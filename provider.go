@@ -275,6 +275,6 @@ func push(ctx context.Context, p *provider, info *sessionInfo) {
 	if sess == nil {
 		return
 	}
-	p.st.Save(sess.SessionID(), p.sf.ExtractValues(sess))
+	p.st.Save(sess.SessionID(), p.sf.ExportValues(sess))
 	info.sess = nil
 }
