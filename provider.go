@@ -113,27 +113,11 @@ type provider struct {
 	ca *cache         // Cached sessions
 	st Storage        // Session storage (persistence, normally)
 	sf SessionFactory // Session factory for session analysis
-	// t  *time.Timer
 }
-
-var _p *provider = nil
-
-// func (p *provider) interruptSyncRoutine() {
-// 	if p == nil || p.t == nil {
-// 		return
-// 	}
-// 	p.mu.Lock()
-// 	defer p.mu.Unlock()
-// 	p.t.Stop()
-// 	p.t = nil
-// }
 
 // Returns a new provider (address for pointer reference).
 func newProvider(ac ageChecker, sf SessionFactory, storage Storage) *provider {
-	// if _p != nil {
-	// 	_p.interruptSyncRoutine()
-	// }
-	_p = &provider{
+	p := &provider{
 		ac: ac,
 		ca: &cache{
 			list.New(),
@@ -143,7 +127,7 @@ func newProvider(ac ageChecker, sf SessionFactory, storage Storage) *provider {
 		st: storage,
 	}
 	if storage == nil {
-		return _p
+		return p
 	}
 	sids, err := storage.List()
 	if err != nil {
@@ -158,18 +142,16 @@ func newProvider(ac ageChecker, sf SessionFactory, storage Storage) *provider {
 		meta := map[string]any{
 			"ct": data["ct"],
 		}
-		// delete(data, "ct")
 
-		sess := _p.sf.Restore(sid, meta, nil)
+		sess := p.sf.Restore(sid, meta, nil)
 
-		_p.ca.Add(&sessionInfo{
+		p.ca.Add(&sessionInfo{
 			sess,
 			sess.SessionID(),
 			sess.Get("ct").(int64),
 		})
 	}
-	// _p.storageSync()
-	return _p
+	return p
 }
 
 var (
@@ -296,22 +278,3 @@ func push(ctx context.Context, p *provider, info *sessionInfo) {
 	p.st.Save(sess.SessionID(), p.sf.ExtractValues(sess))
 	info.sess = nil
 }
-
-// var ProviderSyncRoutineTime time.Duration = 10 * time.Second
-
-// func (p *provider) storageSync() {
-// 	p.mu.Lock()
-// 	defer p.mu.Unlock()
-// 	elem := p.ca.collec.Front()
-// 	for {
-// 		if elem == nil {
-// 			break
-// 		}
-// 		sess := elem.Value.(*cacheNode).sess
-// 			p.st.Save(sess.SessionID(), p.sf.ExtractValues(sess))
-// 		elem = elem.Next()
-// 	}
-// 	p.t = time.AfterFunc(ProviderSyncRoutineTime, func() {
-// 		p.storageSync()
-// 	})
-// }
