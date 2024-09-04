@@ -119,6 +119,19 @@ func (m *Manager) assertProviderAndCookieName() {
 	}
 }
 
+func (m *Manager) createCookie(w http.ResponseWriter, sid string) {
+	http.SetCookie(
+		w,
+		&http.Cookie{
+			Name:     m.cookieName,
+			Value:    url.QueryEscape(sid),
+			Path:     "/",
+			HttpOnly: true,
+			MaxAge:   int(m.maxAge),
+		},
+	)
+}
+
 // Creates or retrieve the session based on the http cookie.
 func (m *Manager) StartSession(w http.ResponseWriter, r *http.Request) (session Session) {
 	m.assertProviderAndCookieName()
@@ -126,11 +139,19 @@ func (m *Manager) StartSession(w http.ResponseWriter, r *http.Request) (session 
 	if err != nil || cookie.Value == "" {
 		sid := m.sessionID()
 		session, err = m.provider.SessionInit(r.Context(), sid)
-		cookie := http.Cookie{Name: m.cookieName, Value: url.QueryEscape(sid), Path: "/", HttpOnly: true, MaxAge: int(m.maxAge)}
-		http.SetCookie(w, &cookie)
+		if err == nil {
+			m.createCookie(w, sid)
+		}
 	} else {
 		sid, _ := url.QueryUnescape(cookie.Value)
 		session, err = m.provider.SessionRead(r.Context(), sid)
+		if err == nil {
+			return
+		}
+		session, err = m.provider.SessionInit(r.Context(), sid)
+		if err == nil {
+			m.createCookie(w, sid)
+		}
 	}
 	if err != nil || session == nil {
 		panic("session: unable to start the session")

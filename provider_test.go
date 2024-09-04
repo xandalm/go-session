@@ -363,21 +363,6 @@ func TestProvider_SessionRead(t *testing.T) {
 
 		assert.Equal(t, got.(*stubSession), sess, "didn't get expected session, got %#v but want %#v", got.(*stubSession), sess)
 	})
-
-	t.Run("init session if has no session to read", func(t *testing.T) {
-		sid := "17af450"
-		got, err := provider.SessionRead(dummyContext, sid)
-
-		assert.NoError(t, err)
-		assert.NotNil(t, got)
-
-		sess := got.(*stubSession)
-		if sess.Id != sid {
-			t.Fatalf("didn't get expected session, got %s but want %s", sess.Id, sid)
-		}
-
-		assert.NotNil(t, cache.Get(sid), "didn't add session into cache")
-	})
 }
 
 func TestProvider_SessionDestroy(t *testing.T) {
@@ -530,6 +515,9 @@ func TestProvider_registerSessionPush(t *testing.T) {
 	provider.sf = factory
 
 	sess.V["foo"] = "bar"
+
+	info.watchers++
+	info.mu.Lock()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	provider.registerSessionPush(ctx, info)

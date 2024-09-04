@@ -55,7 +55,7 @@ func (s *session) mapped(v reflect.Value) any {
 		panic("session: cannot stores chan into session")
 	case reflect.Struct:
 		vFields := reflect.VisibleFields(v.Type())
-		m := Values{}
+		m := map[string]any{}
 		for _, f := range vFields {
 			fValue := v.FieldByName(f.Name)
 			if fValue.Kind() == reflect.Struct || fValue.Kind() == reflect.Map {
@@ -66,7 +66,7 @@ func (s *session) mapped(v reflect.Value) any {
 		}
 		return m
 	case reflect.Map:
-		m := Values{}
+		m := map[string]any{}
 		for _, k := range v.MapKeys() {
 			m[k.String()] = s.mapped(v.MapIndex(k))
 		}

@@ -15,6 +15,7 @@ type sessionInfo struct {
 	ct       int64
 	trusted  bool
 	watchers int
+	mu       sync.Mutex
 }
 
 type cacheNode struct {
@@ -108,7 +109,7 @@ func (c *cache) Get(sid string) *sessionInfo {
 
 // Provider that communicates with storage api to init, read and destroy sessions.
 type provider struct {
-	mu sync.Mutex     // Mutex
+	mu sync.RWMutex   // Mutex
 	ac ageChecker     // Expiration checker
 	ca *cache         // Cached sessions
 	st Storage        // Session storage (persistence, normally)
@@ -162,6 +163,9 @@ var (
 	ErrUnableToEnsureNonDuplicity error = errors.New("session: unable to ensure non-duplicity of sid (storage failure)")
 	ErrUnableToDestroySession     error = errors.New("session: unable to destroy session (storage failure)")
 	ErrUnableToSaveSession        error = errors.New("session: unable to save session (storage failure)")
+	ErrNotFoundSession            error = errors.New("session: not found session, maybe it has already expired")
+	ErrExpiredSession             error = errors.New("session: the session just expired along the way")
+	ErrUnreachableSession         error = errors.New("session: can't load session data from storage")
 )
 
 // Creates a session with the given session identifier.
@@ -176,10 +180,7 @@ var (
 func (p *provider) SessionInit(ctx context.Context, sid string) (Session, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return p.sessionInit(ctx, sid)
-}
 
-func (p *provider) sessionInit(ctx context.Context, sid string) (Session, error) {
 	if sid == "" {
 		return nil, ErrEmptySessionId
 	}
@@ -194,6 +195,10 @@ func (p *provider) sessionInit(ctx context.Context, sid string) (Session, error)
 		ct:      now,
 		trusted: true,
 	}
+
+	info.watchers++
+	info.mu.Lock()
+
 	p.ca.Add(info)
 
 	p.registerSessionPush(ctx, info)
@@ -207,22 +212,23 @@ func (p *provider) sessionInit(ctx context.Context, sid string) (Session, error)
 // Returns error when cannot get session through storage api, or cannot
 // create one. Otherwise, will return the session.
 func (p *provider) SessionRead(ctx context.Context, sid string) (Session, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	info := p.ca.Get(sid)
+	info := p.sessionRead(sid)
 	if info == nil {
-		return p.sessionInit(ctx, sid)
+		return nil, ErrNotFoundSession
 	}
+
+	info.watchers++
+	info.mu.Lock()
+
 	if p.ac.ShouldReap(info.ct) {
-		p.ca.Remove(sid)
-		p.st.Delete(sid)
-		return p.sessionInit(ctx, sid)
+		p.SessionDestroy(sid)
+		return nil, ErrExpiredSession
 	}
 	if info.sess == nil {
 		data, err := p.st.Read(sid)
 		if err != nil {
-			p.ca.Remove(sid)
-			return p.sessionInit(ctx, sid)
+			p.SessionDestroy(sid)
+			return nil, ErrUnreachableSession
 		}
 		meta := Values{
 			"ct": info.ct,
@@ -232,6 +238,16 @@ func (p *provider) SessionRead(ctx context.Context, sid string) (Session, error)
 	}
 	p.registerSessionPush(ctx, info)
 	return info.sess, nil
+}
+
+func (p *provider) sessionRead(sid string) *sessionInfo {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	info := p.ca.Get(sid)
+	if info == nil {
+		return nil
+	}
+	return info
 }
 
 // Destroys the session.
@@ -263,8 +279,8 @@ func (p *provider) SessionGC() {
 }
 
 func (p *provider) onSessionMutation(sess Session) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 
 	info := p.ca.Get(sess.SessionID())
 	if info == nil {
@@ -274,15 +290,14 @@ func (p *provider) onSessionMutation(sess Session) {
 }
 
 func (p *provider) registerSessionPush(ctx context.Context, info *sessionInfo) {
-	info.watchers++
 	go push(ctx, p, info)
 }
 
 func push(ctx context.Context, p *provider, info *sessionInfo) {
 	<-ctx.Done()
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	info.watchers--
+	p.mu.RLock()
+	defer info.mu.Unlock()
+	defer p.mu.RUnlock()
 	if info.trusted || !p.ca.Contains(info.id) || info.sess == nil {
 		return
 	}
@@ -291,6 +306,7 @@ func push(ctx context.Context, p *provider, info *sessionInfo) {
 	if err == nil {
 		info.trusted = true
 	}
+	info.watchers--
 	if info.watchers == 0 {
 		info.sess = nil
 	}
