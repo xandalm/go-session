@@ -1,7 +1,10 @@
 package session
 
 import (
+	"fmt"
 	"maps"
+	"reflect"
+	"strings"
 	"sync"
 	"testing"
 
@@ -50,18 +53,116 @@ func TestSession_Set(t *testing.T) {
 		Values{},
 		nil,
 	}
-	key := "foo"
-	value := "bar"
 
-	sess.Set(key, value)
+	cases := []struct {
+		key   string
+		value any
+	}{
+		{"string", "abc"},
+		{"integer", 1},
+		{"float", 1.1},
+		{"map", map[string]any{"x": 1, "y": 1}},
+		{"slice", []int{1, 2, 3}},
+		{"struct", struct{ X, Y int }{1, 1}},
+	}
 
-	got, ok := sess.v[key]
-	if !ok {
-		t.Fatal("didn't set anything")
+	for _, c := range cases {
+		t.Run(fmt.Sprintf("set %s", strings.ReplaceAll(fmt.Sprintf("%#v", c.value), " ", "")), func(t *testing.T) {
+			sess.Set(c.key, c.value)
+
+			got, ok := sess.v[c.key]
+			if !ok {
+				t.Fatal("didn't set anything")
+			}
+			if !reflect.DeepEqual(got, c.value) {
+				t.Errorf("got value %#v, but want %#v", got, c.value)
+			}
+		})
 	}
-	if got != value {
-		t.Errorf("got value %q, but want %q", got, value)
-	}
+
+	t.Run("panic", func(t *testing.T) {
+		cases := []struct {
+			desc     string
+			value    any
+			panicMsg string
+		}{
+			{
+				"when value is a func",
+				func() {},
+				PanicInvalidByFunc,
+			},
+			{
+				"when value is a pointer",
+				new(int),
+				PanicInvalidByPointer,
+			},
+			{
+				"when value is a chan",
+				make(chan int),
+				PanicInvalidByChan,
+			},
+			{
+				"when value is a slice/array and contains func",
+				[]any{func() {}},
+				PanicInvalidByFunc,
+			},
+			{
+				"when value is a slice/array and contains pointer",
+				[]any{new(float32)},
+				PanicInvalidByPointer,
+			},
+			{
+				"when value is a slice/array and contains chan",
+				[1]any{make(chan struct{})},
+				PanicInvalidByChan,
+			},
+			{
+				"when value is a map and can reach in a func value",
+				map[string]any{"fn": func() {}},
+				PanicInvalidByFunc,
+			},
+			{
+				"when value is a map and can reach in a pointer value",
+				map[int]any{1: map[string]any{"p": new(struct{})}},
+				PanicInvalidByPointer,
+			},
+			{
+				"when value is a map and can reach in a chan value",
+				map[string]any{"ch": make(chan struct{})},
+				PanicInvalidByChan,
+			},
+			{
+				"when value is a struct and can reach in a func field",
+				struct{ Fn any }{func() {}},
+				PanicInvalidByFunc,
+			},
+			{
+				"when value is a struct and can reach in a pointer field",
+				struct{ V any }{struct{ P any }{new(struct{})}},
+				PanicInvalidByPointer,
+			},
+			{
+				"when value is a struct and can reach in a chan field",
+				struct{ Ch any }{make(chan int)},
+				PanicInvalidByChan,
+			},
+		}
+
+		for _, c := range cases {
+			t.Run(fmt.Sprintf("set %s", strings.ReplaceAll(fmt.Sprintf("%#v", c.value), " ", "")), func(t *testing.T) {
+				defer func() {
+					r := recover()
+					if r == nil {
+						t.Fatal("didn't panic")
+					}
+					if r != c.panicMsg {
+						t.Errorf("panic %s, but want %s", r, c.panicMsg)
+					}
+				}()
+				sess.Set("k", c.value)
+			})
+		}
+	})
 }
 
 func TestSession_Delete(t *testing.T) {

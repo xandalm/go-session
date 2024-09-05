@@ -89,7 +89,3 @@ func (s *storage) Delete(id string) error {
 	}
 	return nil
 }
-
-func init() {
-	gob.Register(Values{})
-}

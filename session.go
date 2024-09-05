@@ -9,6 +9,12 @@ import (
 
 var ErrProtectedKeyName error = errors.New("session: the given key name is protected")
 
+var (
+	PanicInvalidByPointer = "session: cannot stores pointer into session"
+	PanicInvalidByFunc    = "session: cannot stores func into session"
+	PanicInvalidByChan    = "session: cannot stores chan into session"
+)
+
 var protectedKeyNames map[string]int8
 
 type session struct {
@@ -33,13 +39,10 @@ func (s *session) Set(key string, value any) error {
 	if _, ok := protectedKeyNames[key]; ok {
 		return ErrProtectedKeyName
 	}
-	rValue := reflect.ValueOf(value)
-	for rValue.Kind() == reflect.Pointer {
-		rValue = reflect.Indirect(rValue)
-	}
 
+	assertNotContainsInvalidTypes(value)
 	s.mu.Lock()
-	s.v[key] = s.mapped(rValue)
+	s.v[key] = value
 	if s.fn != nil {
 		s.fn(s)
 	}
@@ -47,32 +50,29 @@ func (s *session) Set(key string, value any) error {
 	return nil
 }
 
-func (s *session) mapped(v reflect.Value) any {
-	switch v.Kind() {
+func assertNotContainsInvalidTypes(v any) {
+	val := reflect.ValueOf(v)
+	switch val.Kind() {
+	case reflect.Pointer, reflect.UnsafePointer:
+		panic(PanicInvalidByPointer)
 	case reflect.Func:
-		panic("session: cannot stores func into session")
+		panic(PanicInvalidByFunc)
 	case reflect.Chan:
-		panic("session: cannot stores chan into session")
-	case reflect.Struct:
-		vFields := reflect.VisibleFields(v.Type())
-		m := map[string]any{}
-		for _, f := range vFields {
-			fValue := v.FieldByName(f.Name)
-			if fValue.Kind() == reflect.Struct || fValue.Kind() == reflect.Map {
-				m[f.Name] = s.mapped(fValue)
-			} else {
-				m[f.Name] = fValue.Interface()
-			}
+		panic(PanicInvalidByChan)
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < val.Len(); i++ {
+			assertNotContainsInvalidTypes(val.Index(i).Interface())
 		}
-		return m
 	case reflect.Map:
-		m := map[string]any{}
-		for _, k := range v.MapKeys() {
-			m[k.String()] = s.mapped(v.MapIndex(k))
+		for _, k := range val.MapKeys() {
+			assertNotContainsInvalidTypes(val.MapIndex(k).Interface())
 		}
-		return m
-	default:
-		return v.Interface()
+	case reflect.Struct:
+		vFields := reflect.VisibleFields(val.Type())
+		for _, f := range vFields {
+			fValue := val.FieldByName(f.Name)
+			assertNotContainsInvalidTypes(fValue.Interface())
+		}
 	}
 }
 
