@@ -11,6 +11,18 @@ import (
 	"github.com/xandalm/go-session/testing/assert"
 )
 
+func cleanUpStorage(st *storage) func() {
+	return func() {
+		for _, sf := range st.sfs {
+			sf.f.Close()
+		}
+		st.f.Close()
+		if err := os.RemoveAll(st.path); err != nil {
+			log.Fatalf("cannot clean up after test, %v", err)
+		}
+	}
+}
+
 func TestStorage_Save(t *testing.T) {
 	path := "session_storage_test"
 	prefix := "gosess_"
@@ -30,11 +42,7 @@ func TestStorage_Save(t *testing.T) {
 		t.Error("cannot open session file (was the file created?)")
 	})
 
-	t.Cleanup(func() {
-		if err := os.RemoveAll(storage.path); err != nil {
-			log.Fatalf("cannot clean up after test, %v", err)
-		}
-	})
+	t.Cleanup(cleanUpStorage(storage))
 }
 
 func TestStorage_Load(t *testing.T) {
@@ -57,11 +65,7 @@ func TestStorage_Load(t *testing.T) {
 
 	assert.Equal(t, data, values)
 
-	t.Cleanup(func() {
-		if err := os.RemoveAll(storage.path); err != nil {
-			log.Fatalf("cannot clean up after test, %v", err)
-		}
-	})
+	t.Cleanup(cleanUpStorage(storage))
 }
 
 func TestStorage_List(t *testing.T) {
@@ -83,18 +87,14 @@ func TestStorage_List(t *testing.T) {
 		t.Fatal("didn't get any name")
 	}
 
-	want1 := storage.prefix + id1
-	want2 := storage.prefix + id2
+	want1 := id1
+	want2 := id2
 
 	if !slices.Contains(got, want1) || !slices.Contains(got, want2) {
 		t.Errorf("unexpected result, %s and %s must be in %v", want1, want2, got)
 	}
 
-	t.Cleanup(func() {
-		if err := os.RemoveAll(storage.path); err != nil {
-			log.Fatalf("cannot clean up after test, %v", err)
-		}
-	})
+	t.Cleanup(cleanUpStorage(storage))
 }
 
 func TestStorage_Delete(t *testing.T) {
@@ -120,9 +120,5 @@ func TestStorage_Delete(t *testing.T) {
 		t.Error("the file still exists")
 	}
 
-	t.Cleanup(func() {
-		if err := os.RemoveAll(storage.path); err != nil {
-			log.Fatalf("cannot clean up after test, %v", err)
-		}
-	})
+	t.Cleanup(cleanUpStorage(storage))
 }
