@@ -20,7 +20,7 @@ type sessFile struct {
 }
 
 type storage struct {
-	mu     sync.Mutex
+	mu     sync.RWMutex
 	path   string
 	prefix string
 	f      *os.File
@@ -37,7 +37,7 @@ func NewStorage(path, prefix string) *storage {
 		panic(fmt.Sprintf("unable to open storage folder, %v", err))
 	}
 	s := &storage{
-		mu:     sync.Mutex{},
+		mu:     sync.RWMutex{},
 		path:   path,
 		prefix: prefix,
 		f:      f,
@@ -53,8 +53,8 @@ func (s *storage) getSessionFilePositon(id string) (int, bool) {
 }
 
 func (s *storage) getFile(id string) (*os.File, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 	pos, has := s.getSessionFilePositon(id)
 	if has {
@@ -85,8 +85,8 @@ func (s *storage) Save(id string, values Values) error {
 }
 
 func (s *storage) List() ([]string, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	ret := []string{}
 	for _, sf := range s.sfs {
 		ret = append(ret, sf.id)
