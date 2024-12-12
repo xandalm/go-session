@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -413,12 +412,6 @@ func TestSessionsWithFileSystemStorage(t *testing.T) {
 	session.Config("SESSION_ID", 1, session.DefaultSessionFactory, filesystem.NewStorage(path, ""))
 
 	performTest(t)
-
-	t.Cleanup(func() {
-		if err := os.RemoveAll(path); err != nil {
-			t.Fatalf("cannot clean up after test, %v", err)
-		}
-	})
 }
 
 func BenchmarkOnFileSystemStorage(b *testing.B) {
